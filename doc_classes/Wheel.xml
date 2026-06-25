@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Wheel" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A simulated vehicle wheel with suspension raycasting.
+	</brief_description>
+	<description>
+		Wheel is a [Node3D] that represents a single wheel of a vehicle. It creates and manages a [RayCast3D] child node for suspension simulation. The wheel computes suspension forces based on spring stiffness, damping, and the detected collision point. It is typically used as a child of an [Axle] node.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_suspension_rebound_force" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current suspension rebound force in Newtons, calculated from the spring compression and damper velocity.
+			</description>
+		</method>
+	</methods>
+</class>

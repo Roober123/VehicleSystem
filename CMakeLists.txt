@@ -51,12 +51,15 @@ project(godot-cpp-template
 
 add_library(${LIBNAME} SHARED)
 
+# Collect all source files recursively
+file(GLOB_RECURSE SOURCES LIST_DIRECTORIES NO CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/*.cpp"
+    "${PROJECT_SOURCE_DIR}/src/*.h"
+)
+
 target_sources(${LIBNAME}
     PRIVATE
-    src/register_types.cpp
-    src/register_types.h
-    src/example_class.cpp
-    src/example_class.h
+    ${SOURCES}
 )
 
 # Fetch a list of the xml files to use for documentation and add to our target

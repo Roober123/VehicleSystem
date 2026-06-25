@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Vehicle" inherits="RigidBody3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A physically simulated vehicle with suspension, steering, and drivetrain.
+	</brief_description>
+	<description>
+		Vehicle is a [RigidBody3D] node that simulates a multi-axle vehicle with suspension, steering, and a full drivetrain including engine, clutch, gearbox, and driveshaft. It uses [Axle] children to group wheels and distributes drive torque based on each axle's drive ratio.
+
+		The vehicle is configured via three [Resource] properties: [SuspensionData] for suspension tuning, [VehicleEngineData] for engine characteristics, and [GearboxData] for gear ratios and clutch behavior.
+
+		Input is provided through [member throttle_input], [member steer_input], and [member break_input] properties, which should be set each physics frame.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_suspension_data" qualifiers="">
+			<return type="void" />
+			<param index="0" name="data" type="SuspensionData" />
+			<description>
+				Sets the [SuspensionData] resource used to configure suspension parameters for all axles.
+			</description>
+		</method>
+		<method name="get_suspension_data" qualifiers="">
+			<return type="SuspensionData" />
+			<description>
+				Returns the [SuspensionData] resource used for suspension configuration.
+			</description>
+		</method>
+		<method name="set_engine_data" qualifiers="">
+			<return type="void" />
+			<param index="0" name="data" type="VehicleEngineData" />
+			<description>
+				Sets the [VehicleEngineData] resource used to configure the engine simulation.
+			</description>
+		</method>
+		<method name="get_engine_data" qualifiers="">
+			<return type="VehicleEngineData" />
+			<description>
+				Returns the [VehicleEngineData] resource used for engine configuration.
+			</description>
+		</method>
+		<method name="set_gearbox_data" qualifiers="">
+			<return type="void" />
+			<param index="0" name="data" type="GearboxData" />
+			<description>
+				Sets the [GearboxData] resource used to configure the gearbox and clutch.
+			</description>
+		</method>
+		<method name="get_gearbox_data" qualifiers="">
+			<return type="GearboxData" />
+			<description>
+				Returns the [GearboxData] resource used for gearbox configuration.
+			</description>
+		</method>
+		<method name="set_throttle_input" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the throttle input. Values are clamped between 0.0 (no throttle) and 1.0 (full throttle).
+			</description>
+		</method>
+		<method name="get_throttle_input" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current throttle input value (0.0 to 1.0).
+			</description>
+		</method>
+		<method name="set_steer_input" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the steering input. Values are clamped between -1.0 (full left) and 1.0 (full right).
+			</description>
+		</method>
+		<method name="get_steer_input" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current steering input value (-1.0 to 1.0).
+			</description>
+		</method>
+		<method name="set_break_input" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the brake input. Values are clamped between 0.0 (no braking) and 1.0 (full braking).
+			</description>
+		</method>
+		<method name="get_break_input" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current brake input value (0.0 to 1.0).
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="suspension_data" type="SuspensionData" setter="set_suspension_data" getter="get_suspension_data">
+			[SuspensionData] resource configuring the vehicle's suspension.
+		</member>
+		<member name="engine_data" type="VehicleEngineData" setter="set_engine_data" getter="get_engine_data">
+			[VehicleEngineData] resource configuring the vehicle's engine.
+		</member>
+		<member name="gearbox_data" type="GearboxData" setter="set_gearbox_data" getter="get_gearbox_data">
+			[GearboxData] resource configuring the vehicle's gearbox and clutch.
+		</member>
+		<member name="throttle_input" type="float" setter="set_throttle_input" getter="get_throttle_input" default="0.0">
+			Throttle input value (0.0 to 1.0).
+		</member>
+		<member name="steer_input" type="float" setter="set_steer_input" getter="get_steer_input" default="0.0">
+			Steering input value (-1.0 to 1.0).
+		</member>
+		<member name="break_input" type="float" setter="set_break_input" getter="get_break_input" default="0.0">
+			Brake input value (0.0 to 1.0).
+		</member>
+	</members>
+</class>

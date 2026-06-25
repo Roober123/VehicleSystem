@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="GearboxData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Configuration data for a vehicle's gearbox and clutch.
+	</brief_description>
+	<description>
+		GearboxData is a [Resource] that defines gear ratios, final drive ratio, and clutch maximum torque for a vehicle's drivetrain. Used by [Vehicle] to configure its internal clutch and gearbox simulation.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_gear_ratios" qualifiers="">
+			<return type="void" />
+			<param index="0" name="ratios" type="PackedFloat64Array" />
+			<description>
+				Sets the array of gear ratios. Each entry represents a forward gear ratio. Higher ratios provide more torque at lower speeds.
+			</description>
+		</method>
+		<method name="get_gear_ratios" qualifiers="">
+			<return type="PackedFloat64Array" />
+			<description>
+				Returns the array of gear ratios.
+			</description>
+		</method>
+		<method name="set_final_drive" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the final drive ratio applied after the gearbox.
+			</description>
+		</method>
+		<method name="get_final_drive" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the final drive ratio.
+			</description>
+		</method>
+		<method name="set_clutch_max_torque" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the maximum torque the clutch can transmit in Nm.
+			</description>
+		</method>
+		<method name="get_clutch_max_torque" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the maximum torque the clutch can transmit in Nm.
+			</description>
+		</method>
+		<method name="set_reverse_ratio" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the reverse gear ratio. Should be a negative value for backward motion.
+			</description>
+		</method>
+		<method name="get_reverse_ratio" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the reverse gear ratio.
+			</description>
+		</method>
+		<method name="set_shift_time" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the duration of a gear change in seconds. Controls how long the clutch takes to disengage/re-engage during shifts.
+			</description>
+		</method>
+		<method name="get_shift_time" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the gear change duration in seconds.
+			</description>
+		</method>
+		<method name="set_upshift_rpm" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the engine RPM threshold for automatic upshifting.
+			</description>
+		</method>
+		<method name="get_upshift_rpm" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the automatic upshift RPM threshold.
+			</description>
+		</method>
+		<method name="set_downshift_rpm" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the engine RPM threshold for automatic downshifting.
+			</description>
+		</method>
+		<method name="get_downshift_rpm" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the automatic downshift RPM threshold.
+			</description>
+		</method>
+		<method name="set_auto_mode" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				If true, gearbox operates in fully automatic mode. If false, semi-automatic mode where the user controls gear changes but clutch handling is automatic.
+			</description>
+		</method>
+		<method name="get_auto_mode" qualifiers="">
+			<return type="bool" />
+			<description>
+				Returns whether the gearbox is in automatic mode.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="gear_ratios" type="PackedFloat64Array" setter="set_gear_ratios" getter="get_gear_ratios" default="[3.5, 2.1, 1.4, 1.0, 0.75]">
+			Array of forward gear ratios. Gear 1 uses index 0, gear 2 uses index 1, etc.
+		</member>
+		<member name="final_drive" type="float" setter="set_final_drive" getter="get_final_drive" default="3.73">
+			Final drive ratio.
+		</member>
+		<member name="clutch_max_torque" type="float" setter="set_clutch_max_torque" getter="get_clutch_max_torque" default="400.0">
+			Maximum torque the clutch can transmit in Nm.
+		</member>
+		<member name="reverse_ratio" type="float" setter="set_reverse_ratio" getter="get_reverse_ratio" default="-3.0">
+			Reverse gear ratio. Negative value drives the vehicle backward.
+		</member>
+		<member name="shift_time" type="float" setter="set_shift_time" getter="get_shift_time" default="0.25">
+			Duration of a gear change in seconds.
+		</member>
+		<member name="upshift_rpm" type="float" setter="set_upshift_rpm" getter="get_upshift_rpm" default="3500.0">
+			Engine RPM threshold for automatic upshifting.
+		</member>
+		<member name="downshift_rpm" type="float" setter="set_downshift_rpm" getter="get_downshift_rpm" default="2000.0">
+			Engine RPM threshold for automatic downshifting.
+		</member>
+		<member name="auto_mode" type="bool" setter="set_auto_mode" getter="get_auto_mode" default="true">
+			If true, gearbox operates in fully automatic mode. If false, semi-automatic mode.
+		</member>
+	</members>
+</class>

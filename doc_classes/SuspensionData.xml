@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SuspensionData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Configuration data for vehicle suspension parameters.
+	</brief_description>
+	<description>
+		SuspensionData is a [Resource] that holds the tunable parameters for a vehicle's suspension system. It defines the suspension length, rest compression ratio, and damping ratio used by [Axle] and [Wheel] nodes to compute per-wheel suspension forces.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_suspension_length" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the maximum suspension travel length in meters.
+			</description>
+		</method>
+		<method name="get_suspension_length" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the maximum suspension travel length in meters.
+			</description>
+		</method>
+		<method name="set_rest_compression" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the fraction of suspension travel compressed at rest under the vehicle's weight. A value of 0.25 means 25% compression at rest.
+			</description>
+		</method>
+		<method name="get_rest_compression" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the fraction of suspension travel compressed at rest.
+			</description>
+		</method>
+		<method name="set_damping_ratio" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the suspension damping ratio. Values below 1.0 are underdamped, 1.0 is critically damped, and above 1.0 is overdamped.
+			</description>
+		</method>
+		<method name="get_damping_ratio" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the suspension damping ratio.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="suspension_length" type="float" setter="set_suspension_length" getter="get_suspension_length" default="1.0">
+			Maximum suspension travel length in meters.
+		</member>
+		<member name="rest_compression" type="float" setter="set_rest_compression" getter="get_rest_compression" default="0.25">
+			Fraction of suspension travel compressed at rest under the vehicle's weight.
+		</member>
+		<member name="damping_ratio" type="float" setter="set_damping_ratio" getter="get_damping_ratio" default="0.5">
+			Damping ratio for the suspension. 1.0 is critically damped.
+		</member>
+	</members>
+</class>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Axle" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A vehicle axle that groups wheels and distributes drive forces.
+	</brief_description>
+	<description>
+		Axle is a [Node3D] that serves as a grouping node for [Wheel] children. It computes suspension parameters for each wheel based on the vehicle mass and [SuspensionData] resource. It also controls steering and drive torque distribution via configurable properties.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_steerable" qualifiers="">
+			<return type="void" />
+			<param index="0" name="is_steerable" type="bool" />
+			<description>
+				If [code]true[/code], the wheels on this axle will steer in response to the vehicle's steering input.
+			</description>
+		</method>
+		<method name="get_steerable" qualifiers="">
+			<return type="bool" />
+			<description>
+				Returns whether this axle is steerable.
+			</description>
+		</method>
+		<method name="set_drive_ratio" qualifiers="">
+			<return type="void" />
+			<param index="0" name="drive_ratio" type="float" />
+			<description>
+				Sets the fraction of engine torque sent to this axle. Values range from 0.0 to 1.0. For example, 0.5 sends 50% of the torque to this axle.
+			</description>
+		</method>
+		<method name="get_drive_ratio" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the fraction of engine torque sent to this axle.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="is_steerable" type="bool" setter="set_steerable" getter="get_steerable" default="false">
+			If [code]true[/code], this axle responds to steering input.
+		</member>
+		<member name="drive_ratio" type="float" setter="set_drive_ratio" getter="get_drive_ratio" default="0.0">
+			Fraction of engine torque applied to this axle (0.0 to 1.0).
+		</member>
+	</members>
+</class>

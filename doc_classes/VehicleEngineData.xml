@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleEngineData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Configuration data for a vehicle's engine characteristics.
+	</brief_description>
+	<description>
+		VehicleEngineData is a [Resource] that defines the performance characteristics of a vehicle engine, including its torque curve, idle and redline RPM ranges, rotational inertia, and maximum torque output. Used by [Vehicle] to configure its internal [VehicleEngine] simulation.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_torque_curve" qualifiers="">
+			<return type="void" />
+			<param index="0" name="curve" type="Curve" />
+			<description>
+				Sets the torque curve [Curve] resource. The curve maps engine RPM (normalized 0-1) to torque output (normalized 0-1).
+			</description>
+		</method>
+		<method name="get_torque_curve" qualifiers="">
+			<return type="Curve" />
+			<description>
+				Returns the torque curve [Curve] resource.
+			</description>
+		</method>
+		<method name="set_idle_rpm" qualifiers="">
+			<return type="void" />
+			<param index="0" name="rpm" type="float" />
+			<description>
+				Sets the engine idle RPM. The engine will attempt to maintain this RPM when no throttle is applied.
+			</description>
+		</method>
+		<method name="get_idle_rpm" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the engine idle RPM.
+			</description>
+		</method>
+		<method name="set_redline_rpm" qualifiers="">
+			<return type="void" />
+			<param index="0" name="rpm" type="float" />
+			<description>
+				Sets the engine redline RPM. The maximum RPM the engine can reach.
+			</description>
+		</method>
+		<method name="get_redline_rpm" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the engine redline RPM.
+			</description>
+		</method>
+		<method name="set_inertia" qualifiers="">
+			<return type="void" />
+			<param index="0" name="inertia" type="float" />
+			<description>
+				Sets the rotational inertia of the engine in kg·m². Higher values make the engine spool up and slow down more slowly.
+			</description>
+		</method>
+		<method name="get_inertia" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the rotational inertia of the engine in kg·m².
+			</description>
+		</method>
+		<method name="set_max_torque" qualifiers="">
+			<return type="void" />
+			<param index="0" name="torque" type="float" />
+			<description>
+				Sets the maximum engine torque output in Nm. The actual torque at any given RPM is determined by the torque curve multiplied by this value.
+			</description>
+		</method>
+		<method name="get_max_torque" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the maximum engine torque output in Nm.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="torque_curve" type="Curve" setter="set_torque_curve" getter="get_torque_curve">
+			Torque curve mapping normalized RPM (0-1) to normalized torque (0-1). The actual torque is this multiplied by [member max_torque].
+		</member>
+		<member name="idle_rpm" type="float" setter="set_idle_rpm" getter="get_idle_rpm" default="850.0">
+			Engine idle RPM.
+		</member>
+		<member name="redline_rpm" type="float" setter="set_redline_rpm" getter="get_redline_rpm" default="5000.0">
+			Engine redline RPM.
+		</member>
+		<member name="inertia" type="float" setter="set_inertia" getter="get_inertia" default="1.0">
+			Rotational inertia of the engine in kg·m².
+		</member>
+		<member name="max_torque" type="float" setter="set_max_torque" getter="get_max_torque" default="300.0">
+			Maximum torque output in Nm.
+		</member>
+	</members>
+</class>
