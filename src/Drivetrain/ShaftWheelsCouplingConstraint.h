@@ -14,7 +14,7 @@ class ShaftWheelsCouplingConstraint {
     real_t coupling_stiffness = 0.0;
     real_t coupling_damping   = 0.0;
 
-    real_t omega_n = 3.0;   // Natural frequency (rad/s) — softened for tire slip compliance
+    real_t omega_n = 3.0;   // Natural frequency (rad/s)
     real_t zeta    = 1.0;   // Damping ratio — critically damped, no oscillation
 
     public:

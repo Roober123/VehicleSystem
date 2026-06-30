@@ -3,77 +3,84 @@
 namespace godot {
 
 void TireData::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("set_friction_coefficient", "value"), &TireData::set_friction_coefficient);
-    ClassDB::bind_method(D_METHOD("get_friction_coefficient"), &TireData::get_friction_coefficient);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_coefficient", PROPERTY_HINT_RANGE, "0.0,2.0,0.05"), "set_friction_coefficient", "get_friction_coefficient");
+    ClassDB::bind_method(D_METHOD("set_friction_forward", "value"), &TireData::set_friction_forward);
+    ClassDB::bind_method(D_METHOD("get_friction_forward"), &TireData::get_friction_forward);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_forward", PROPERTY_HINT_RANGE, "0.0,2.0,0.05"), "set_friction_forward", "get_friction_forward");
+
+    ClassDB::bind_method(D_METHOD("set_friction_lateral", "value"), &TireData::set_friction_lateral);
+    ClassDB::bind_method(D_METHOD("get_friction_lateral"), &TireData::get_friction_lateral);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_lateral", PROPERTY_HINT_RANGE, "0.0,2.0,0.05"), "set_friction_lateral", "get_friction_lateral");
+
+    ClassDB::bind_method(D_METHOD("set_forward_friction_curve", "value"), &TireData::set_forward_friction_curve);
+    ClassDB::bind_method(D_METHOD("get_forward_friction_curve"), &TireData::get_forward_friction_curve);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "forward_friction_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
+                          "set_forward_friction_curve", "get_forward_friction_curve");
+
+    ClassDB::bind_method(D_METHOD("set_lateral_friction_curve", "value"), &TireData::set_lateral_friction_curve);
+    ClassDB::bind_method(D_METHOD("get_lateral_friction_curve"), &TireData::get_lateral_friction_curve);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "lateral_friction_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
+                          "set_lateral_friction_curve", "get_lateral_friction_curve");
 
     ClassDB::bind_method(D_METHOD("set_radius", "value"), &TireData::set_radius);
     ClassDB::bind_method(D_METHOD("get_radius"), &TireData::get_radius);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.05,1.0,0.05"), "set_radius", "get_radius");
 
-    ClassDB::bind_method(D_METHOD("set_longitudinal_stiffness", "value"), &TireData::set_longitudinal_stiffness);
-    ClassDB::bind_method(D_METHOD("get_longitudinal_stiffness"), &TireData::get_longitudinal_stiffness);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "longitudinal_stiffness", PROPERTY_HINT_RANGE, "1000,500000,1000"), "set_longitudinal_stiffness", "get_longitudinal_stiffness");
-
-    ClassDB::bind_method(D_METHOD("set_lateral_stiffness", "value"), &TireData::set_lateral_stiffness);
-    ClassDB::bind_method(D_METHOD("get_lateral_stiffness"), &TireData::get_lateral_stiffness);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lateral_stiffness", PROPERTY_HINT_RANGE, "1000,500000,1000"), "set_lateral_stiffness", "get_lateral_stiffness");
-
-    ClassDB::bind_method(D_METHOD("set_patch_length", "value"), &TireData::set_patch_length);
-    ClassDB::bind_method(D_METHOD("get_patch_length"), &TireData::get_patch_length);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "patch_length", PROPERTY_HINT_RANGE, "0.05,1.0,0.05"), "set_patch_length", "get_patch_length");
-
     ClassDB::bind_method(D_METHOD("set_brake_power", "value"), &TireData::set_brake_power);
     ClassDB::bind_method(D_METHOD("get_brake_power"), &TireData::get_brake_power);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "brake_power", PROPERTY_HINT_RANGE, "0.0,10000.0,100.0"), "set_brake_power", "get_brake_power");
+
+    ClassDB::bind_method(D_METHOD("set_drag", "value"), &TireData::set_drag);
+    ClassDB::bind_method(D_METHOD("get_drag"), &TireData::get_drag);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "drag", PROPERTY_HINT_RANGE, "0.0,2.0,0.001"), "set_drag", "get_drag");
+
+    ClassDB::bind_method(D_METHOD("set_peak_slip_angle", "value"), &TireData::set_peak_slip_angle);
+    ClassDB::bind_method(D_METHOD("get_peak_slip_angle"), &TireData::get_peak_slip_angle);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak_slip_angle", PROPERTY_HINT_RANGE, "3.0,25.0,0.5,degrees"), "set_peak_slip_angle", "get_peak_slip_angle");
+
+    ClassDB::bind_method(D_METHOD("set_relaxation_low", "value"), &TireData::set_relaxation_low);
+    ClassDB::bind_method(D_METHOD("get_relaxation_low"), &TireData::get_relaxation_low);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "relaxation_low", PROPERTY_HINT_RANGE, "0.005,0.2,0.001,or_greater"), "set_relaxation_low", "get_relaxation_low");
+
+    ClassDB::bind_method(D_METHOD("set_relaxation_high", "value"), &TireData::set_relaxation_high);
+    ClassDB::bind_method(D_METHOD("get_relaxation_high"), &TireData::get_relaxation_high);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "relaxation_high", PROPERTY_HINT_RANGE, "0.001,0.05,0.001,or_greater"), "set_relaxation_high", "get_relaxation_high");
+
+    ClassDB::bind_method(D_METHOD("set_tire_width", "value"), &TireData::set_tire_width);
+    ClassDB::bind_method(D_METHOD("get_tire_width"), &TireData::get_tire_width);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "tire_width", PROPERTY_HINT_RANGE, "0.05,1.0,0.01,metres"), "set_tire_width", "get_tire_width");
 }
 
-void TireData::set_friction_coefficient(real_t value) {
-    friction_coefficient = value;
-}
+void TireData::set_friction_forward(real_t value) { friction_forward = value; }
+real_t TireData::get_friction_forward() { return friction_forward; }
 
-real_t TireData::get_friction_coefficient() {
-    return friction_coefficient;
-}
+void TireData::set_friction_lateral(real_t value) { friction_lateral = value; }
+real_t TireData::get_friction_lateral() { return friction_lateral; }
 
-void TireData::set_radius(real_t value) {
-    radius = value;
-}
+void TireData::set_forward_friction_curve(const Ref<Curve>& value) { forward_friction_curve = value; }
+Ref<Curve> TireData::get_forward_friction_curve() const { return forward_friction_curve; }
 
-real_t TireData::get_radius() {
-    return radius;
-}
+void TireData::set_lateral_friction_curve(const Ref<Curve>& value) { lateral_friction_curve = value; }
+Ref<Curve> TireData::get_lateral_friction_curve() const { return lateral_friction_curve; }
 
-void TireData::set_longitudinal_stiffness(real_t value) {
-    longitudinal_stiffness = value;
-}
+void TireData::set_radius(real_t value) { radius = value; }
+real_t TireData::get_radius() { return radius; }
 
-real_t TireData::get_longitudinal_stiffness() {
-    return longitudinal_stiffness;
-}
+void TireData::set_brake_power(real_t value) { brake_power = value; }
+real_t TireData::get_brake_power() { return brake_power; }
 
-void TireData::set_lateral_stiffness(real_t value) {
-    lateral_stiffness = value;
-}
+void TireData::set_drag(real_t value) { drag = value; }
+real_t TireData::get_drag() { return drag; }
 
-real_t TireData::get_lateral_stiffness() {
-    return lateral_stiffness;
-}
+void TireData::set_peak_slip_angle(real_t value) { peak_slip_angle = value; }
+real_t TireData::get_peak_slip_angle() { return peak_slip_angle; }
 
-void TireData::set_patch_length(real_t value) {
-    patch_length = value;
-}
+void TireData::set_relaxation_low(real_t value) { relaxation_low = value; }
+real_t TireData::get_relaxation_low() { return relaxation_low; }
 
-real_t TireData::get_patch_length() {
-    return patch_length;
-}
+void TireData::set_relaxation_high(real_t value) { relaxation_high = value; }
+real_t TireData::get_relaxation_high() { return relaxation_high; }
 
-void TireData::set_brake_power(real_t value) {
-    brake_power = value;
-}
+void TireData::set_tire_width(real_t value) { tire_width = value; }
+real_t TireData::get_tire_width() { return tire_width; }
 
-real_t TireData::get_brake_power() {
-    return brake_power;
 }
-
-} // namespace godot

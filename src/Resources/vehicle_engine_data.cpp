@@ -11,12 +11,12 @@ void VehicleEngineData::_bind_methods() {
     // Idle RPM
     ClassDB::bind_method(D_METHOD("set_idle_rpm", "rpm"), &VehicleEngineData::set_idle_rpm);
     ClassDB::bind_method(D_METHOD("get_idle_rpm"), &VehicleEngineData::get_idle_rpm);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "idle_rpm", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_idle_rpm", "get_idle_rpm");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "idle_rpm", PROPERTY_HINT_RANGE, "0,2500,1,or_greater"), "set_idle_rpm", "get_idle_rpm");
 
     // Redline RPM
     ClassDB::bind_method(D_METHOD("set_redline_rpm", "rpm"), &VehicleEngineData::set_redline_rpm);
     ClassDB::bind_method(D_METHOD("get_redline_rpm"), &VehicleEngineData::get_redline_rpm);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "redline_rpm", PROPERTY_HINT_RANGE, "0,20000,1,or_greater"), "set_redline_rpm", "get_redline_rpm");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "redline_rpm", PROPERTY_HINT_RANGE, "0,15000,1,or_greater"), "set_redline_rpm", "get_redline_rpm");
 
     // Inertia
     ClassDB::bind_method(D_METHOD("set_inertia", "inertia"), &VehicleEngineData::set_inertia);
@@ -26,7 +26,17 @@ void VehicleEngineData::_bind_methods() {
     // Max torque
     ClassDB::bind_method(D_METHOD("set_max_torque", "torque"), &VehicleEngineData::set_max_torque);
     ClassDB::bind_method(D_METHOD("get_max_torque"), &VehicleEngineData::get_max_torque);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_torque", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_max_torque", "get_max_torque");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_torque", PROPERTY_HINT_RANGE, "0,3000,1,or_greater"), "set_max_torque", "get_max_torque");
+
+    // Engine drag
+    ClassDB::bind_method(D_METHOD("set_engine_drag", "drag"), &VehicleEngineData::set_engine_drag);
+    ClassDB::bind_method(D_METHOD("get_engine_drag"), &VehicleEngineData::get_engine_drag);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "engine_drag", PROPERTY_HINT_RANGE, "0.0,1.0,0.001"), "set_engine_drag", "get_engine_drag");
+
+    // Engine braking
+    ClassDB::bind_method(D_METHOD("set_engine_braking", "braking"), &VehicleEngineData::set_engine_braking);
+    ClassDB::bind_method(D_METHOD("get_engine_braking"), &VehicleEngineData::get_engine_braking);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "engine_braking", PROPERTY_HINT_RANGE, "0.0,3.0,0.01"), "set_engine_braking", "get_engine_braking");
 }
 
 // Torque curve
@@ -74,4 +84,22 @@ real_t VehicleEngineData::get_max_torque() const {
     return max_torque;
 }
 
-} // namespace godot
+// Engine drag
+void VehicleEngineData::set_engine_drag(real_t p_drag) {
+    engine_drag = p_drag;
+}
+
+real_t VehicleEngineData::get_engine_drag() const {
+    return engine_drag;
+}
+
+// Engine braking
+void VehicleEngineData::set_engine_braking(real_t p_braking) {
+    engine_braking = p_braking;
+}
+
+real_t VehicleEngineData::get_engine_braking() const {
+    return engine_braking;
+}
+
+}

@@ -16,7 +16,8 @@ class GearboxData : public Resource {
     real_t shift_time = 0.25;       
     real_t upshift_rpm_ratio = 0.8;    
     real_t downshift_rpm_ratio = 0.25;  
-    bool auto_mode = true;          
+    bool auto_mode = true;
+    real_t driveshaft_drag = 0.05;  // Drivetrain rotational drag          
 
 protected:
     static void _bind_methods();
@@ -49,6 +50,9 @@ public:
 
     void set_auto_mode(bool p_value);
     bool get_auto_mode() const;
+
+    void set_driveshaft_drag(real_t p_value);
+    real_t get_driveshaft_drag() const;
 };
 
 } // namespace godot

@@ -8,7 +8,7 @@ class ClutchGearConstraint {
 	RotationalBody* engine = nullptr;
 	RotationalBody* output = nullptr;
 
-public:
+ public:
 	real_t clutch_engagement = 0.0;   // 0 = disengaged, 1 = fully locked
 	real_t clutch_max_torque = 400.0; // Nm
 
@@ -23,7 +23,7 @@ public:
 	RotationalBody* get_output() const  { return output; }
 
 	real_t get_effective_ratio() const;
-	void solve(real_t dt);
+	void solve(real_t dt, real_t engine_torque, real_t reflected_load_torque);
 };
 
-} // namespace godot
+}

@@ -11,6 +11,8 @@ class VehicleEngineData : public Resource {
     real_t redline_rpm = 5000;
     real_t inertia = 1.0;
     real_t max_torque = 300; // Nm
+    real_t engine_drag = 0.02;
+    real_t engine_braking = 0.5;
 
     protected:
     static void _bind_methods();
@@ -35,6 +37,14 @@ class VehicleEngineData : public Resource {
     // Max torque
     void set_max_torque(real_t p_torque);
     real_t get_max_torque() const;
+
+    // Engine drag
+    void set_engine_drag(real_t p_drag);
+    real_t get_engine_drag() const;
+
+    // Engine braking
+    void set_engine_braking(real_t p_braking);
+    real_t get_engine_braking() const;
 };
 
 

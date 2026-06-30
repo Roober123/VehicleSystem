@@ -5,16 +5,16 @@ namespace godot {
 
 class SteeringRackData : public Resource {
     GDCLASS(SteeringRackData, Resource);
-    real_t inertia;
+    real_t inertia = 0.3;
 
-    real_t damping;
-    real_t friction_coefficient;
-    real_t max_angle; // degrees
+    real_t damping = 5.0;
+    real_t friction_coefficient = 0.3;
+    real_t max_angle = 35.0; // degrees
 
-    real_t proportional_gain;
-    real_t derivative_gain;
+    real_t proportional_gain = 400.0;
+    real_t derivative_gain = 25.0;
 
-    real_t sat_gain;
+    real_t sat_gain = 0.5;
 
     protected:
     static void _bind_methods();

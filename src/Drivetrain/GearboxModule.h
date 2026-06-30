@@ -22,12 +22,13 @@ class GearboxModule {
     enum class ShiftState {
         Idle,           // No shift in progress, clutch fully engaged
         Disengaging,    // Clutch ramping from 1.0 to 0.0
-        GearChange,     // Clutch at 0, gear index changes
+        GearChange,     // Clutch at 0
         ReEngaging      // Clutch ramping from 0.0 to 1.0
     } state = ShiftState::Idle;
 
     real_t shift_timer = 0.0;
     int target_gear = 0;
+    real_t shift_cooldown = 0.0;
 
 
     real_t disengage_duration = 0.0;
@@ -38,13 +39,17 @@ class GearboxModule {
     void start_shift(int gear);
     void perform_gear_change();
     real_t get_current_rpm_normalized() const;
+    real_t get_driveshaft_rpm_normalized() const;
     int get_gear_count() const;
+
+    void _shift_automatic(real_t dt);
+    void _shift_manual();
 
     public:
     void load_constraint(ClutchGearConstraint* c, const Ref<GearboxData>& g);
-    void update(real_t dt);
-    void update_shifting_logic();
-    void update_clutch_logic(real_t dt);
+    void update(real_t dt, real_t brake_input = 0.0, real_t throttle_input = 0.0);
+    void update_shifting_logic(real_t dt);
+    void update_clutch_logic(real_t dt, real_t brake_input, real_t throttle_input);
 
     // Semi-auto commands
     void shift_up();

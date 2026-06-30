@@ -11,11 +11,11 @@ void VehicleTelemetry::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_engine_torque"), &VehicleTelemetry::get_engine_torque);
     ClassDB::bind_method(D_METHOD("get_engine_throttle"), &VehicleTelemetry::get_engine_throttle);
     ClassDB::bind_method(D_METHOD("get_driveshaft_rpm"), &VehicleTelemetry::get_driveshaft_rpm);
-    ClassDB::bind_method(D_METHOD("get_driveshaft_twist"), &VehicleTelemetry::get_driveshaft_twist);
     ClassDB::bind_method(D_METHOD("get_clutch_engagement"), &VehicleTelemetry::get_clutch_engagement);
     ClassDB::bind_method(D_METHOD("get_current_gear"), &VehicleTelemetry::get_current_gear);
     ClassDB::bind_method(D_METHOD("get_gear_ratio"), &VehicleTelemetry::get_gear_ratio);
     ClassDB::bind_method(D_METHOD("get_vehicle_speed_kph"), &VehicleTelemetry::get_vehicle_speed_kph);
+    ClassDB::bind_method(D_METHOD("get_turbo_boost"), &VehicleTelemetry::get_turbo_boost);
     ClassDB::bind_method(D_METHOD("get_wheel_angular_velocities"), &VehicleTelemetry::get_wheel_angular_velocities);
     ClassDB::bind_method(D_METHOD("get_tire_forces"), &VehicleTelemetry::get_tire_forces);
 }
@@ -66,6 +66,9 @@ void VehicleTelemetry::_process(double delta) {
     clutch_engagement = cg.clutch_engagement;
     current_gear = cg.current_gear;
     gear_ratio = cg.get_effective_ratio();
+
+    // Turbo boost
+    turbo_boost = eng.get_turbo_boost();
 
     // Vehicle speed
     vehicle_speed_kph = target->get_speed_kph();

@@ -4,9 +4,9 @@
 		Telemetry node that reads and exposes vehicle drivetrain data for UI or debugging.
 	</brief_description>
 	<description>
-		VehicleTelemetry is a [Node] that automatically reads drivetrain state from a [Vehicle] node and exposes it through readable properties. It can auto-detect its target [Vehicle] by checking the parent or sibling nodes, or you can assign one manually via [method set_target].
+		VehicleTelemetry is a [Node] that automatically reads drivetrain state from a [Vehicle] node and exposes it through readable properties. It can auto-detect its target by checking the parent or sibling nodes, or assign one manually via [method set_target].
 
-		Use this node to display real-time vehicle data such as RPM, speed, gear, and clutch engagement in a HUD or debug overlay.
+		Use this node to display real-time data like RPM, speed, gear, and clutch engagement in a HUD or debug overlay.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -33,49 +33,55 @@
 		<method name="get_engine_torque" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current engine torque output in Nm.
+				Returns the engine's current torque output in Newton-meters.
 			</description>
 		</method>
 		<method name="get_engine_throttle" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current engine throttle position (0.0 to 1.0).
+				Returns the current throttle input (0.0 to 1.0).
 			</description>
 		</method>
 		<method name="get_driveshaft_rpm" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current driveshaft RPM.
-			</description>
-		</method>
-		<method name="get_driveshaft_twist" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the current driveshaft twist (angular displacement).
+				Returns the driveshaft angular velocity converted to RPM.
 			</description>
 		</method>
 		<method name="get_clutch_engagement" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current clutch engagement value (0.0 = disengaged, 1.0 = fully engaged).
+				Returns the clutch engagement level (0.0 = fully disengaged, 1.0 = fully locked).
 			</description>
 		</method>
 		<method name="get_current_gear" qualifiers="const">
 			<return type="int" />
 			<description>
-				Returns the current gear number. 0 is neutral, 1+ are forward gears.
+				Returns the currently engaged gear. 0 = neutral, positive = forward gears, negative = reverse.
 			</description>
 		</method>
 		<method name="get_gear_ratio" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current effective gear ratio (gear ratio × final drive).
+				Returns the effective gear ratio (selected gear ratio x final drive).
 			</description>
 		</method>
 		<method name="get_vehicle_speed_kph" qualifiers="const">
 			<return type="float" />
 			<description>
 				Returns the vehicle's speed in kilometers per hour.
+			</description>
+		</method>
+		<method name="get_wheel_angular_velocities" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<description>
+				Returns an array of wheel angular velocities in RPM, one per wheel across all axles.
+			</description>
+		</method>
+		<method name="get_tire_forces" qualifiers="const">
+			<return type="PackedVector3Array" />
+			<description>
+				Returns an array of per-wheel tire forces (world-space vectors), one per wheel across all axles.
 			</description>
 		</method>
 	</methods>

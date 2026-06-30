@@ -59,5 +59,8 @@
 		<member name="damping_ratio" type="float" setter="set_damping_ratio" getter="get_damping_ratio" default="0.5">
 			Damping ratio for the suspension. 1.0 is critically damped.
 		</member>
+		<member name="antiroll_bar_stiffness" type="float" setter="set_antiroll_bar_stiffness" getter="get_antiroll_bar_stiffness" default="20000.0">
+			Anti-roll bar stiffness. Higher values resist body roll by applying opposing forces to paired wheels on the same axle.
+		</member>
 	</members>
 </class>

@@ -14,11 +14,11 @@ class VehicleTelemetry : public Node {
     real_t engine_torque = 0.0;
     real_t engine_throttle = 0.0;
     real_t driveshaft_rpm = 0.0;
-    real_t driveshaft_twist = 0.0;
     real_t clutch_engagement = 0.0;
     int current_gear = 0;
     real_t gear_ratio = 0.0;
     real_t vehicle_speed_kph = 0.0;
+    real_t turbo_boost = 0.0;
     PackedFloat64Array wheel_angular_velocities;
     PackedVector3Array tire_forces;
 
@@ -41,11 +41,11 @@ public:
     real_t get_engine_torque() const { return engine_torque; }
     real_t get_engine_throttle() const { return engine_throttle; }
     real_t get_driveshaft_rpm() const { return driveshaft_rpm; }
-    real_t get_driveshaft_twist() const { return driveshaft_twist; }
     real_t get_clutch_engagement() const { return clutch_engagement; }
     int get_current_gear() const { return current_gear; }
     real_t get_gear_ratio() const { return gear_ratio; }
     real_t get_vehicle_speed_kph() const { return vehicle_speed_kph; }
+    real_t get_turbo_boost() const { return turbo_boost; }
     PackedFloat64Array get_wheel_angular_velocities() const { return wheel_angular_velocities; }
     PackedVector3Array get_tire_forces() const { return tire_forces; }
 };

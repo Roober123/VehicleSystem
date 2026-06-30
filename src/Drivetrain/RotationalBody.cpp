@@ -25,4 +25,4 @@ void RotationalBody::set_angular_velocity(real_t value) {
 	angular_velocity = value;
 }
 
-} // namespace godot
+}

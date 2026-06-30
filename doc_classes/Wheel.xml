@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="Wheel" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A simulated vehicle wheel with suspension raycasting.
+		A vehicle wheel with suspension raycasting, tanh-based tire forces, and self-aligning torque.
 	</brief_description>
 	<description>
-		Wheel is a [Node3D] that represents a single wheel of a vehicle. It creates and manages a [RayCast3D] child node for suspension simulation. The wheel computes suspension forces based on spring stiffness, damping, and the detected collision point. It is typically used as a child of an [Axle] node.
+		Wheel is a [Node3D] that represents a single wheel of a vehicle. It creates and manages a [RayCast3D] child node for suspension simulation, and uses a tanh-based tire model for smooth, progressive lateral and longitudinal force generation. Each Wheel should be a child of an [Axle] node.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -12,8 +12,87 @@
 		<method name="get_suspension_rebound_force" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the current suspension rebound force in Newtons, calculated from the spring compression and damper velocity.
+				Returns the current suspension rebound force in Newtons, calculated from spring compression and damper velocity.
+			</description>
+		</method>
+		<method name="get_angular_velocity" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the wheel's angular velocity in radians per second.
+			</description>
+		</method>
+		<method name="get_tire_force" qualifiers="const">
+			<return type="Vector3" />
+			<description>
+				Returns the tire force (world-space) applied to the vehicle last physics frame, averaged across substeps.
+			</description>
+		</method>
+		<method name="get_reaction_torque" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the drivetrain reaction torque at this wheel from longitudinal tire forces.
+			</description>
+		</method>
+		<method name="get_collision_point" qualifiers="const">
+			<return type="Vector3" />
+			<description>
+				Returns the world-space position where the wheel contacts the ground surface.
+			</description>
+		</method>
+		<method name="get_collision_normal" qualifiers="const">
+			<return type="Vector3" />
+			<description>
+				Returns the world-space surface normal at the wheel's contact point.
+			</description>
+		</method>
+		<method name="is_on_ground" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the wheel's suspension raycast is currently intersecting a surface.
+			</description>
+		</method>
+		<method name="get_sustained_mass" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the effective mass in kilograms supported by this wheel, computed from suspension compression. Used by the tire model to determine the friction limit.
+			</description>
+		</method>
+		<method name="get_compression" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the suspension compression ratio. 0.0 means fully extended (no contact), 1.0 means fully compressed (bottomed out).
+			</description>
+		</method>
+		<method name="get_self_aligning_torque" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the self-aligning torque in Newton-meters at the steering axis from lateral tire forces. Positive values try to steer the wheel right, negative values try to steer left.
+			</description>
+		</method>
+		<method name="get_slip_ratio" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the longitudinal slip ratio: [code](tire_speed - road_speed) / road_speed[/code]. 0.0 means pure rolling, 1.0 means spinning freely, negative values indicate braking/locked.
+			</description>
+		</method>
+		<method name="get_slip_angle" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the lateral slip angle in degrees. 0 means the tire is pointing in its direction of travel; larger values indicate the tire is sliding sideways.
+			</description>
+		</method>
+		<method name="get_abs_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if ABS is actively modulating brake pressure this physics frame.
+			</description>
+		</method>
+		<method name="get_is_sliding" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the wheel is currently sliding (excessive slip ratio or slip angle).
 			</description>
 		</method>
 	</methods>
 </class>
+

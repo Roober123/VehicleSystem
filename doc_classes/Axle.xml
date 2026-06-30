@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="Axle" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A vehicle axle that groups wheels and distributes drive forces.
+		A vehicle axle that groups wheels and controls steering, drive torque, and anti-roll.
 	</brief_description>
 	<description>
-		Axle is a [Node3D] that serves as a grouping node for [Wheel] children. It computes suspension parameters for each wheel based on the vehicle mass and [SuspensionData] resource. It also controls steering and drive torque distribution via configurable properties.
+		Axle is a [Node3D] that serves as a grouping node for [Wheel] children. It computes suspension parameters per wheel, controls steering via an internal steering rack model, distributes drive torque, and provides anti-roll bar force between paired wheels.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -13,7 +13,7 @@
 			<return type="void" />
 			<param index="0" name="is_steerable" type="bool" />
 			<description>
-				If [code]true[/code], the wheels on this axle will steer in response to the vehicle's steering input.
+				If [code]true[/code], the wheels on this axle respond to the vehicle's steering input.
 			</description>
 		</method>
 		<method name="get_steerable" qualifiers="">
@@ -26,13 +26,45 @@
 			<return type="void" />
 			<param index="0" name="drive_ratio" type="float" />
 			<description>
-				Sets the fraction of engine torque sent to this axle. Values range from 0.0 to 1.0. For example, 0.5 sends 50% of the torque to this axle.
+				Sets the fraction of engine torque sent to this axle (0.0 to 1.0). Values across all axles should sum to 1.0.
 			</description>
 		</method>
 		<method name="get_drive_ratio" qualifiers="">
 			<return type="float" />
 			<description>
-				Returns the fraction of engine torque sent to this axle.
+				Returns the drive torque ratio for this axle.
+			</description>
+		</method>
+		<method name="set_steering_rack_data" qualifiers="">
+			<return type="void" />
+			<param index="0" name="data" type="SteeringRackData" />
+			<description>
+				Sets the [SteeringRackData] resource for configuring the steering rack (gains, inertia, friction).
+			</description>
+		</method>
+		<method name="get_steering_rack_data" qualifiers="">
+			<return type="SteeringRackData" />
+			<description>
+				Returns the [SteeringRackData] resource.
+			</description>
+		</method>
+		<method name="set_downforce_ratio" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the fraction of total aerodynamic downforce applied to this axle (0.0 to 1.0).
+			</description>
+		</method>
+		<method name="get_downforce_ratio" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the downforce ratio for this axle.
+			</description>
+		</method>
+		<method name="get_steer_angle" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current steering angle in radians applied to the wheels on this axle.
 			</description>
 		</method>
 	</methods>
@@ -42,6 +74,18 @@
 		</member>
 		<member name="drive_ratio" type="float" setter="set_drive_ratio" getter="get_drive_ratio" default="0.0">
 			Fraction of engine torque applied to this axle (0.0 to 1.0).
+		</member>
+		<member name="downforce_ratio" type="float" setter="set_downforce_ratio" getter="get_downforce_ratio" default="0.5">
+			Fraction of total aerodynamic downforce applied to this axle (0.0 to 1.0).
+		</member>
+		<member name="steering_rack_data" type="SteeringRackData" setter="set_steering_rack_data" getter="get_steering_rack_data">
+			[SteeringRackData] resource configuring the steering rack dynamics (gains, inertia, friction, max angle).
+		</member>
+		<member name="tire_data" type="TireData" setter="set_tire_data" getter="get_tire_data">
+			[TireData] resource configuring tire parameters for all wheels on this axle. Overrides the vehicle-level tire data if set.
+		</member>
+		<member name="differential_type" type="String" setter="set_differential_type" getter="get_differential_type" default="&quot;Open&quot;">
+			Type of differential: [code]Open[/code], [code]LSD[/code] (Limited-Slip Differential), or [code]Torsen[/code]. Affects torque distribution between left and right wheels.
 		</member>
 	</members>
 </class>

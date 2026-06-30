@@ -23,10 +23,13 @@ class SuspensionData : public Resource {
     void set_damping_ratio(real_t value);
     real_t get_damping_ratio();
 
+    void set_antiroll_bar_stiffness(real_t value);
+    real_t get_antiroll_bar_stiffness();
 
     real_t suspension_length = 1.0;
     real_t rest_compression = 0.25;
     real_t damping_ratio = 0.5;
+    real_t antiroll_bar_stiffness = 20000.0;
     
 };
 

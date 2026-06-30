@@ -27,4 +27,4 @@ public:
 	real_t get_torque() const { return torque; }
 };
 
-} // namespace godot
+}

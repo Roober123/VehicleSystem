@@ -2,6 +2,9 @@
 #include "RotationalBody.h"
 #include "godot_cpp/classes/curve.hpp"
 #include "Resources/vehicle_engine_data.h"
+#include <cmath>
+#include <algorithm>
+#include "Drivetrain/Turbo.h"
 
 
 namespace godot {
@@ -11,6 +14,12 @@ class VehicleEngine : public RotationalBody {
     real_t idle_rpm = 750.0;
     real_t redline_rpm = 4500.0;
     real_t max_torque = 300.0;
+    real_t engine_braking = 0.5;
+
+    bool rev_limit_cut = false;
+    real_t rev_limit_timer = 0.0;
+
+    Turbo* turbo = nullptr;
     
 
     public:
@@ -23,16 +32,25 @@ class VehicleEngine : public RotationalBody {
         redline_rpm = r->get_redline_rpm();
         max_torque = r->get_max_torque();
         inertia = r->get_inertia();
-        
+        drag = r->get_engine_drag();
+        engine_braking = r->get_engine_braking();
+        angular_velocity = idle_rpm / 60 *  2 * Math_PI;
     }
     VehicleEngine() {}
     
+    void set_turbo(Turbo *t) { turbo = t; }
+
     real_t get_rpm_normalized();
     real_t get_torque();
     real_t get_available_torque();
-    
+    real_t get_idle_rpm() const { return idle_rpm; }
+    real_t get_redline_rpm() const { return redline_rpm; }
+    real_t get_current_torque();
+    real_t get_current_horsepower();
+    real_t get_turbo_boost();
+    real_t get_rpm() { return angular_velocity * 60.0 / 2.0 / Math_PI; }
 
-    void accumulate_torque();
+    void accumulate_torque(real_t dt);
     void integrate(real_t dt);
 
     real_t throttle = 0.0;

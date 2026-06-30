@@ -11,10 +11,16 @@
 #include "Resources/suspension_data.h"
 #include "Resources/vehicle_engine_data.h"
 #include "Resources/gearbox_data.h"
-#include "wheel.h"
-#include "VehicleTelemetry.h"
+#include "Resources/vehicle_aerodynamics_data.h"
 #include "Resources/tire_data.h"
 #include "Resources/steering_rack_data.h"
+
+#include "wheel.h"
+#include "VehicleTelemetry.h"
+#include "TireSkid.h"
+#include "Resources/turbo_data.h"
+
+
 
 using namespace godot;
 
@@ -23,6 +29,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	GDREGISTER_CLASS(TurboData);
+	GDREGISTER_CLASS(VehicleAerodynamicsData);
 	GDREGISTER_CLASS(SuspensionData);
 	GDREGISTER_CLASS(VehicleEngineData);
 	GDREGISTER_CLASS(GearboxData);
@@ -32,6 +40,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(Axle);
 	GDREGISTER_CLASS(Vehicle);
 	GDREGISTER_CLASS(VehicleTelemetry);
+	GDREGISTER_CLASS(TireSkid);
 	
 	
 

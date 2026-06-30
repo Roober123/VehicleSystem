@@ -17,7 +17,6 @@ void ShaftWheelsCouplingConstraint::load_bodies(RotationalBody* veh_driveshaft, 
         }
     }
 
-    //  get the rest of chain inertia because
     const real_t I_ds_original = driveshaft->get_inertia();
     driveshaft->set_inertia(I_ds_original + I_wheels);
 
@@ -51,4 +50,4 @@ void ShaftWheelsCouplingConstraint::solve() {
     }
 }
 
-} // namespace godot
+}

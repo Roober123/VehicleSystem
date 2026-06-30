@@ -10,8 +10,8 @@ namespace godot {
 
 class SteeringRack {
 
-    real_t angle; // rad
-    real_t angular_velocity;
+    real_t angle = 0.0; // rad
+    real_t angular_velocity = 0.0;
     real_t inertia;
 
     real_t damping;
@@ -24,8 +24,8 @@ class SteeringRack {
     real_t sat_gain;
     public:
     void load(const Ref<SteeringRackData>& s);
-    void solve(real_t steer_input, real_t sat_torque);
-
+    void solve(real_t steer_input, real_t sat_torque, real_t dt, real_t speed_kph = 0.0);
+    real_t get_angle() const;
 };
 
 }

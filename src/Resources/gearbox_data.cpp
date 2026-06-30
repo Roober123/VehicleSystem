@@ -39,6 +39,11 @@ void GearboxData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_auto_mode", "value"), &GearboxData::set_auto_mode);
     ClassDB::bind_method(D_METHOD("get_auto_mode"), &GearboxData::get_auto_mode);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_mode"), "set_auto_mode", "get_auto_mode");
+
+    // Driveshaft drag
+    ClassDB::bind_method(D_METHOD("set_driveshaft_drag", "value"), &GearboxData::set_driveshaft_drag);
+    ClassDB::bind_method(D_METHOD("get_driveshaft_drag"), &GearboxData::get_driveshaft_drag);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "driveshaft_drag", PROPERTY_HINT_RANGE, "0.0,1.0,0.001"), "set_driveshaft_drag", "get_driveshaft_drag");
 }
 
 void GearboxData::set_gear_ratios(const PackedFloat64Array &p_ratios) {
@@ -105,4 +110,12 @@ bool GearboxData::get_auto_mode() const {
     return auto_mode;
 }
 
-} // namespace godot
+void GearboxData::set_driveshaft_drag(real_t p_value) {
+    driveshaft_drag = p_value;
+}
+
+real_t GearboxData::get_driveshaft_drag() const {
+    return driveshaft_drag;
+}
+
+}

@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dh0oj81pufivs"]
 
 [ext_resource type="Script" uid="uid://06aisqxy5utj" path="res://test.gd" id="1_2jas5"]
+[ext_resource type="Script" uid="uid://b0goi32hsanjd" path="res://chase_camera.gd" id="1_chasecam"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_2jas5"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -14,27 +15,69 @@ background_mode = 2
 sky = SubResource("Sky_n51mc")
 glow_enabled = true
 
-[sub_resource type="SuspensionData" id="SuspensionData_n51mc"]
-suspension_length = 0.5
-rest_compression = 0.3
-damping_ratio = 0.75
+[sub_resource type="SuspensionData" id="SuspensionData_yivbd"]
+suspension_length = 0.8
+rest_compression = 0.5
+damping_ratio = 1.0
+antiroll_bar_stiffness = 12000.0
 
 [sub_resource type="Curve" id="Curve_n51mc"]
-_data = [Vector2(0.003289476, 0.40136057), 0.0, 0.0, 0, 0, Vector2(0.28947368, 0.92517006), 0.0, 0.0, 0, 0, Vector2(0.85197365, 1), 0.0, 0.0, 0, 0, Vector2(1, 0.42176872), 0.0, 0.0, 0, 0]
-point_count = 4
+_data = [Vector2(0, 0.41841012), 0.0, 2.5034132, 0, 0, Vector2(0.8340517, 1), 0.0, 0.0, 0, 0, Vector2(0.99568963, 0.6401675), 0.0, 0.0, 0, 0]
+point_count = 3
 
-[sub_resource type="VehicleEngineData" id="VehicleEngineData_n51mc"]
+[sub_resource type="VehicleEngineData" id="VehicleEngineData_l7kk7"]
 torque_curve = SubResource("Curve_n51mc")
-inertia = 0.8
-max_torque = 150.0
+redline_rpm = 6000.0
+inertia = 0.605
+max_torque = 225.0
+engine_braking = 0.3
 
-[sub_resource type="GearboxData" id="GearboxData_2jas5"]
-gear_ratios = PackedFloat64Array(3.5, 2.1)
-final_drive = 3.0
-clutch_max_torque = 550.0
-shift_time = 0.3
+[sub_resource type="GearboxData" id="GearboxData_c52e2"]
+gear_ratios = PackedFloat64Array(5, 3, 2.2, 1.6, 1.2, 0.9)
+clutch_max_torque = 500.0
 
-[sub_resource type="TireData" id="TireData_7p8v7"]
+[sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_gi0ev"]
+yaw_damping_coefficient = 1.0
+
+[sub_resource type="TurboData" id="TurboData_n51mc"]
+max_boost = 0.3
+
+[sub_resource type="Curve" id="Curve_ei00m"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.21551722, 1), 0.0, 0.0, 0, 0, Vector2(0.49784482, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.65271974), 0.0, 0.0, 0, 0]
+point_count = 5
+
+[sub_resource type="Curve" id="Curve_ugfer"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 0.10468469, 0, 0, Vector2(1.0043104, 0.9916319), 0.0, 0.0, 0, 0, Vector2(2, 0.8577407), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="TireData" id="TireData_8lvy3"]
+friction_lateral = 0.9
+forward_friction_curve = SubResource("Curve_ei00m")
+lateral_friction_curve = SubResource("Curve_ugfer")
+brake_power = 600.0
+peak_slip_angle = 14.0
+relaxation_low = 0.06
+tire_width = 0.3
+
+[sub_resource type="SteeringRackData" id="SteeringRackData_n51mc"]
+max_angle = 33.0
+sat_gain = 0.12
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_porlw"]
+top_radius = 0.3
+bottom_radius = 0.3
+height = 0.3
+
+[sub_resource type="TireData" id="TireData_n51mc"]
+friction_lateral = 0.95
+forward_friction_curve = SubResource("Curve_ei00m")
+lateral_friction_curve = SubResource("Curve_ugfer")
+brake_power = 600.0
+peak_slip_angle = 14.0
+relaxation_low = 0.06
+tire_width = 0.3
 
 [sub_resource type="BoxMesh" id="BoxMesh_porlw"]
 size = Vector3(1.7, 0.438, 4.8)
@@ -59,32 +102,58 @@ transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545
 shadow_enabled = true
 
 [node name="Vehicle" type="Vehicle" parent="." unique_id=357085417]
-suspension_data = SubResource("SuspensionData_n51mc")
-engine_data = SubResource("VehicleEngineData_n51mc")
-gearbox_data = SubResource("GearboxData_2jas5")
-tire_data = SubResource("TireData_7p8v7")
+suspension_data = SubResource("SuspensionData_yivbd")
+engine_data = SubResource("VehicleEngineData_l7kk7")
+gearbox_data = SubResource("GearboxData_c52e2")
+aero_data = SubResource("VehicleAerodynamicsData_gi0ev")
+turbo_data = SubResource("TurboData_n51mc")
+substeps = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6853267, 1.5508447)
 mass = 1500.0
 center_of_mass_mode = 1
-
-[node name="Axle" type="Axle" parent="Vehicle" unique_id=2062533440]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.19209498, -1.483766)
-
-[node name="Wheel" type="Wheel" parent="Vehicle/Axle" unique_id=379914716]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 0)
-
-[node name="Wheel2" type="Wheel" parent="Vehicle/Axle" unique_id=2123617535]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 0)
+center_of_mass = Vector3(0, -0.05, 0.2)
+linear_damp_mode = 1
+angular_damp_mode = 1
 
 [node name="Axle2" type="Axle" parent="Vehicle" unique_id=278175441]
-drive_ratio = 1.0
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.19209498, 1.7160292)
+is_steerable = true
+tire_data = SubResource("TireData_8lvy3")
+steering_rack_data = SubResource("SteeringRackData_n51mc")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2883057, 1.7160292)
 
 [node name="Wheel" type="Wheel" parent="Vehicle/Axle2" unique_id=1145563054]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 0)
 
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle2/Wheel" unique_id=525817576]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_porlw")
+
 [node name="Wheel2" type="Wheel" parent="Vehicle/Axle2" unique_id=1871255799]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle2/Wheel2" unique_id=841360301]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_porlw")
+
+[node name="Axle" type="Axle" parent="Vehicle" unique_id=2062533440]
+drive_ratio = 1.0
+tire_data = SubResource("TireData_n51mc")
+differential_type = "LSD"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2883057, -1.483766)
+
+[node name="Wheel" type="Wheel" parent="Vehicle/Axle" unique_id=379914716]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle/Wheel" unique_id=225311224]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_porlw")
+
+[node name="Wheel2" type="Wheel" parent="Vehicle/Axle" unique_id=2123617535]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle/Wheel2" unique_id=1171921634]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_porlw")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle" unique_id=1610439945]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.03, 0)
@@ -96,13 +165,17 @@ shape = SubResource("ConvexPolygonShape3D_2jas5")
 
 [node name="VehicleTelemetry" type="VehicleTelemetry" parent="Vehicle" unique_id=-468373194]
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1918319115]
-transform = Transform3D(-0.9659258, 0, 0.25881913, 0, 1, 0, -0.25881913, 0, -0.9659258, 0.72083646, 0.85367376, -3.2797215)
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=291821691 node_paths=PackedStringArray("target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)
+current = true
+script = ExtResource("1_chasecam")
+target = NodePath("../Vehicle")
+distance = 8.0
 
 [node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=612644778]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.01121974, -1.236045, 0.0025596619)
 use_collision = true
-size = Vector3(100, 1, 100)
+size = Vector3(100, 1, 5000)
 material = SubResource("StandardMaterial3D_ray1q")
 
 [node name="Control" type="Control" parent="." unique_id=794027967]
@@ -142,11 +215,6 @@ label_settings = SubResource("LabelSettings_ray1q")
 [node name="DriveshaftRPMLabel" type="Label" parent="Control/VBoxContainer" unique_id=-468467291]
 layout_mode = 2
 text = "Driveshaft RPM: 0"
-label_settings = SubResource("LabelSettings_ray1q")
-
-[node name="DriveshaftTwistLabel" type="Label" parent="Control/VBoxContainer" unique_id=-468467290]
-layout_mode = 2
-text = "Driveshaft Twist: 0.00"
 label_settings = SubResource("LabelSettings_ray1q")
 
 [node name="ClutchLabel" type="Label" parent="Control/VBoxContainer" unique_id=-468467289]
@@ -203,3 +271,8 @@ label_settings = SubResource("LabelSettings_ray1q")
 layout_mode = 2
 text = "Wheel 4 Force: (0, 0, 0)"
 label_settings = SubResource("LabelSettings_ray1q")
+
+[node name="CSGBox3D2" type="CSGBox3D" parent="." unique_id=269955825]
+transform = Transform3D(0.27338564, -0.9619045, 0, 0.9619045, 0.27338564, 0, 0, 0, 1, -10.770731, 0.9101963, 5.5429964)
+use_collision = true
+size = Vector3(1, 15.786377, 12.8125)

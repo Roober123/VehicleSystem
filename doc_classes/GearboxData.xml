@@ -139,5 +139,8 @@
 		<member name="auto_mode" type="bool" setter="set_auto_mode" getter="get_auto_mode" default="true">
 			If true, gearbox operates in fully automatic mode. If false, semi-automatic mode.
 		</member>
+		<member name="driveshaft_drag" type="float" setter="set_driveshaft_drag" getter="get_driveshaft_drag" default="0.05">
+			Rotational drag applied to the driveshaft. Higher values smooth out drivetrain oscillations and reduce overshoot.
+		</member>
 	</members>
 </class>

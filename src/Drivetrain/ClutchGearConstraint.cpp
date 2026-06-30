@@ -15,42 +15,38 @@ real_t ClutchGearConstraint::get_effective_ratio() const {
 	return gear_ratios[index] * final_drive;
 }
 
-void ClutchGearConstraint::solve(real_t dt) {
+void ClutchGearConstraint::solve(real_t dt, real_t engine_torque, real_t reflected_load_torque) {
 	if (engine == nullptr || output == nullptr)
 		return;
 
-	const real_t ratio = get_effective_ratio();
+	const real_t r = get_effective_ratio();
+	if (r == 0.0)
+		return; 
+	const real_t angular_velocity_e = engine->get_angular_velocity();
+	const real_t angular_velocity_o = output->get_angular_velocity();
+	const real_t I_e = engine->get_inertia();
+	const real_t I_o = output->get_inertia();
+	const real_t angular_velocity_ref = angular_velocity_o * r;
+	const real_t I_ref = I_o / (r * r);
 
-	if (ratio == 0.0)
-		return;
+	const real_t I_total   = I_e + I_ref;
+	const real_t momentum  = I_e * angular_velocity_e + I_ref * angular_velocity_ref;
+	const real_t torque_net= engine_torque - reflected_load_torque;
+	const real_t angular_velocity_target  = (momentum + torque_net * dt) / I_total;
 
-	const real_t engine_omega = engine->get_angular_velocity();
-	const real_t reflected_omega = output->get_angular_velocity() * ratio;
-	const real_t slip = engine_omega - reflected_omega;
 
-	real_t clutch_torque = clutch_engagement * clutch_max_torque;
+	real_t torque_c = engine_torque - I_e * (angular_velocity_target - angular_velocity_e) / dt;
 
-	if (slip < 0.0) {
-		clutch_torque = -clutch_torque;
-	}
+	const real_t capacity = clutch_engagement * clutch_max_torque;
+	torque_c = std::clamp(torque_c, -capacity, capacity);
 
-	const real_t engine_inertia = engine->get_inertia();
-	const real_t output_inertia = output->get_inertia();
+	//const real_t slip   = angular_velocity_e - angular_velocity_ref;
+	//const real_t I_eff  = (I_e * I_o) / (I_o + I_e * r * r);
+	//const real_t max_stopping = std::abs(slip) * I_eff / std::max(dt, real_t{1e-6});
+	//torque_c = std::clamp(torque_c, -max_stopping, max_stopping);
 
-	// Clamp only to prevent slip from reversing sign in one timestep
-	// (numerical stability). The driveshaft inertia now includes wheel
-	// inertias set by ShaftWheelsCouplingConstraint::load_bodies, so
-	// the gear-ratio amplification no longer causes wild overshoot.
-	const real_t combined_inertia = (engine_inertia * output_inertia)
-	                              / (output_inertia + engine_inertia * ratio * ratio);
-	const real_t max_stopping_torque = std::abs(slip) * combined_inertia / std::max(dt, real_t{1e-6});
-
-	if (std::abs(clutch_torque) > max_stopping_torque) {
-		clutch_torque = (clutch_torque > 0.0 ? 1.0 : -1.0) * max_stopping_torque;
-	}
-
-	engine->add_torque(-clutch_torque);
-	output->add_torque(clutch_torque * ratio);
+	engine->add_torque(-torque_c);
+	output->add_torque(torque_c * r);
 }
 
-} // namespace godot
+} 

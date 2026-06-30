@@ -91,5 +91,8 @@
 		<member name="max_torque" type="float" setter="set_max_torque" getter="get_max_torque" default="300.0">
 			Maximum torque output in Nm.
 		</member>
+		<member name="engine_drag" type="float" setter="set_engine_drag" getter="get_engine_drag" default="0.02">
+			Internal engine friction/drag coefficient. Higher values increase engine braking and slow RPM decay.
+		</member>
 	</members>
 </class>
