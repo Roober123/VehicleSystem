@@ -1,56 +1,90 @@
-# godot-cpp template
-This repository serves as a quickstart template for GDExtension development with Godot 4.0+.
+# VehicleSystem — Godot 4 GDExtension
 
-## Contents
-* Preconfigured source files for C++ development of the GDExtension ([src/](./src/))
-* An empty Godot project in [project/](./project), to test the GDExtension
-* godot-cpp as a submodule (`godot-cpp/`)
-* GitHub Issues template ([.github/ISSUE_TEMPLATE.yml](./.github/ISSUE_TEMPLATE.yml))
-* GitHub CI/CD workflows to publish your library packages when creating a release ([.github/workflows/builds.yml](./.github/workflows/builds.yml))
-* An SConstruct file with various functions, such as boilerplate for [Adding documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_docs_system.html)
+A fully simulated vehicle physics system for Godot 4, built as a native GDExtension in C++. Features a complete drivetrain with engine, clutch, gearbox, differential, suspension, tires  aerodynamics, turbo, traction control, ABS.
 
-## Usage - Template
+Built on the [godot-cpp](https://github.com/godotengine/godot-cpp) template.
 
-To use this template, log in to GitHub and click the green "Use this template" button at the top of the repository page. This will let you create a copy of this repository with a clean git history.
+## Features
+- **Substepping** - user can use substepping for better stability without bumping up the engine physics ticks. For best quality it is recommended to use 120hz in engine physics and 2 substeps.
+- **Engine** — Torque curve, rev-limiter, idle controller, internal friction, engine braking
+- **Turbo** — Spool-up/down dynamics, boost pressure curve, configurable via `TurboData`
+- **Clutch & Gearbox** — Automatic and semi-automatic modes, configurable ratios, shift timing, clutch engagement simulation
+- **Drivetrain** — Driveshaft, per-axle differentials (Open, LSD, Torsen), shaft-to-wheel coupling constraint
+- **Suspension** — Per-wheel spring-damper, anti-roll bars, configurable via `SuspensionData`
+- **Tires** — Custom friction curves, relaxation, self-aligning torque, ABS
+- **Steering Rack** — P-D controller with inertia and friction, speed-sensitive, self-aligning torque feedback
+- **Aerodynamics** — Drag, downforce (per-axle distribution), yaw damping
+- **Traction Control** — Slip-based torque reduction
+- **Skid Marks** — Procedural mesh ribbons via `TireSkid` (auto-cleanup, no runtime allocations)
+- **Exhaust FX** — Smoke, heat, and flame probability for visual effects
+- **Telemetry** — `VehicleTelemetry` node for UI/HUD: RPM, speed, gear, clutch, torque, boost, wheel speeds
 
-To get started with your new GDExtension, do the following:
+## Getting Started
 
-* clone your repository to your local computer
-* initialize the godot-cpp git submodule via `git submodule update --init`
-* change the name of the compiled library file inside the [SConstruct](./SConstruct) file by modifying the `libname` string.
-  * change the paths of the to be loaded library name inside the [project/bin/example.gdextension](./project/bin/example.gdextension) file, by replacing `EXTENSION-NAME` with the name you chose for `libname`.
-* change the `entry_symbol` string inside [project/bin/example.gdextension](./project/bin/example.gdextension) file.
-  * rename the `example_library_init` function in [src/register_types.cpp](./src/register_types.cpp) to the same name you chose for `entry_symbol`.
-* change the name of the `project/bin/example.gdextension` file
+### Prerequisites
 
-Now, you can build the project with the following command:
+- Godot 4.7+
+- SCons (`pip install scons`)
+- C++17 compiler (MSVC, GCC/MinGW, or Clang)
+
+### Build
 
 ```shell
-scons
+scons -j4
 ```
 
-If the build command worked, you can test it with the [project](./project) project. Import it into Godot, open it, and launch the main scene. You should see it print the following line in the console:
+The compiled library will be placed in `project/bin/`. Open the `project/` folder in Godot to test.
+
+### Platform-specific
+
+| Platform | Build target |
+|----------|-------------|
+| Windows  | `scons platform=windows` |
+| Linux    | `scons platform=linux` |
+| macOS    | `scons platform=macos` |
+
+## Project Structure
 
 ```
-Type: 24
+├── src/                    # Extension source code
+│   ├── vehicle.h/cpp       # Main Vehicle node (RigidBody3D)
+│   ├── axle.h/cpp           # Axle node (groups wheels)
+│   ├── wheel.h/cpp          # Wheel node (suspension + tire forces)
+│   ├── SteeringRack.h/cpp   # Steering rack dynamics
+│   ├── TireSkid.h/cpp       # Skid mark system
+│   ├── VehicleAerodynamics.h/cpp
+│   ├── ExhaustSystem.h/cpp
+│   ├── TractionControl.h/cpp
+│   ├── VehicleTelemetry.h/cpp
+│   ├── Drivetrain/          # Engine, clutch, gearbox, differentials, turbo
+│   ├── Resources/           # Godot Resource classes (SuspensionData, TireData, etc.)
+│   └── register_types.cpp   # GDExtension entry point
+├── project/                # Godot test project
+├── doc_classes/            # XML documentation for the Godot doc system
+└── godot-cpp/              # godot-cpp submodule
 ```
 
-### Configuring an IDE
-You can develop your own extension with any text editor and by invoking scons on the command line, but if you want to work with an IDE (Integrated Development Environment), you can use a compilation database file called `compile_commands.json`. Most IDEs should automatically identify this file, and self-configure appropriately.
-To generate the database file, you can run one of the following commands in the project root directory:
+## Configuration
+
+All vehicle parameters are configured via Godot **Resource** files:
+
+| Resource | Description |
+|----------|-------------|
+| `SuspensionData` | Spring rate, damping, anti-roll bar |
+| `TireData` | Friction, radius, brake power, slip angle, relaxation |
+| `VehicleEngineData` | Torque curve, RPM limits, inertia, drag |
+| `GearboxData` | Gear ratios, final drive, clutch, shift time, auto/manual |
+| `TurboData` | Spool rates, boost pressure, RPM range |
+| `VehicleAerodynamicsData` | Drag, downforce, yaw damping |
+| `SteeringRackData` | Gains, inertia, friction, max angle |
+
+
+## Documentation
+
+Generate GDExtension docs with:
+
 ```shell
-# Generate compile_commands.json while compiling
-scons compiledb=yes
-
-# Generate compile_commands.json without compiling
-scons compiledb=yes compile_commands.json
+scons doc
 ```
 
-## Usage - Actions
 
-This repository comes with continuous integration (CI) through a GitHub action that tests building the GDExtension.
-It triggers automatically for each pushed change. You can find and edit it in [builds.yml](.github/workflows/ci.yml).
-
-There is also a workflow ([make_build.yml](.github/workflows/make_build.yml)) that builds the GDExtension for all supported platforms that you can use to create releases.
-You can trigger this workflow manually from the `Actions` tab on GitHub.
-After it is complete, you can find the file `godot-cpp-template.zip` in the `Artifacts` section of the workflow run.

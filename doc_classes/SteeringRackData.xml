@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SteeringRackData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A resource that defines steering rack dynamics (P-D controller with inertia).
+	</brief_description>
+	<description>
+		SteeringRackData is a [Resource] that configures the steering rack simulated inside steerable axles. The rack uses a proportional-derivative controller with inertia, damping, and friction to produce smooth steering feel.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="inertia" type="float" setter="set_inertia" getter="get_inertia" default="0.3">
+			Rotational inertia of the steering rack. Lower values make steering more responsive.
+		</member>
+		<member name="damping" type="float" setter="set_damping" getter="get_damping" default="5.0">
+			Steering damping coefficient. Higher values smooth out steering oscillations.
+		</member>
+		<member name="friction_coefficient" type="float" setter="set_friction_coefficient" getter="get_friction_coefficient" default="0.3">
+			Coulomb friction in the rack. Higher values add mechanical resistance to steering motion.
+		</member>
+		<member name="max_angle" type="float" setter="set_max_angle" getter="get_max_angle" default="35.0">
+			Maximum steering angle in degrees at the wheels when speed is zero. This is reduced at high speed by the speed-sensitive steering factor.
+		</member>
+		<member name="proportional_gain" type="float" setter="set_proportional_gain" getter="get_proportional_gain" default="400.0">
+			Proportional gain of the steering rack P-D controller. Higher values make the steering snap to the target angle faster.
+		</member>
+		<member name="derivative_gain" type="float" setter="set_derivative_gain" getter="get_derivative_gain" default="25.0">
+			Derivative gain of the steering rack P-D controller. Higher values damp steering velocity.
+		</member>
+		<member name="sat_gain" type="float" setter="set_sat_gain" getter="get_sat_gain" default="0.5">
+			Gain applied to self-aligning torque feedback into the steering rack. Higher values give stronger centering feel.
+		</member>
+	</members>
+</class>

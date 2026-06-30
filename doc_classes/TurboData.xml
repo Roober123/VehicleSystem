@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TurboData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A resource that defines turbocharger characteristics: spool rates, max boost, and RPM ranges.
+	</brief_description>
+	<description>
+		TurboData is a [Resource] that configures a turbocharger simulation for the vehicle's engine. The turbo builds boost progressively based on engine RPM and exhaust flow, adding extra torque above atmospheric pressure.
+
+		Boost pressure follows a curve: it starts building at [member start_rpm], reaches maximum at [member max_boost_rpm], and optionally falls off after [member fall_rpm]. The [member spool_up] and [member spool_down] rates control how quickly boost responds to throttle changes.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="spool_up" type="float" setter="set_spool_up" getter="get_spool_up" default="2.0">
+			Turbo spool-up rate. Higher values make the turbo reach target boost faster under acceleration.
+		</member>
+		<member name="spool_down" type="float" setter="set_spool_down" getter="get_spool_down" default="1.0">
+			Turbo spool-down rate. Higher values make boost drop faster when lifting off the throttle.
+		</member>
+		<member name="max_boost" type="float" setter="set_max_boost" getter="get_max_boost" default="30.0">
+			Maximum boost pressure in psi above atmospheric.
+		</member>
+		<member name="start_rpm" type="float" setter="set_start_rpm" getter="get_start_rpm" default="1500.0">
+			Engine RPM at which the turbo starts building boost.
+		</member>
+		<member name="max_boost_rpm" type="float" setter="set_max_boost_rpm" getter="get_max_boost_rpm" default="4000.0">
+			Engine RPM at which maximum boost is reached.
+		</member>
+		<member name="fall_rpm" type="float" setter="set_fall_rpm" getter="get_fall_rpm" default="6000.0">
+			Engine RPM after which boost begins to taper off (if above max_boost_rpm).
+		</member>
+	</members>
+</class>

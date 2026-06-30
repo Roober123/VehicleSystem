@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TireSkid" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Generates skid mark ribbons at tire contact points using procedural mesh geometry.
+	</brief_description>
+	<description>
+		TireSkid is a [Node3D] that creates and manages skid mark ribbons. It is created automatically as a child of each [Wheel] node and should not be added manually. Skid marks are rendered as triangle-strip ribbons on a procedurally generated [ArrayMesh].
+
+		The skid system uses fixed-size ring buffers for performance (no runtime allocations). Once a ribbon reaches its maximum point count or the tire stops sliding, the ribbon is finalized and fades out over [code]LIFETIME[/code] seconds before being recycled.
+
+		[b]Note:[/b] TireSkid reparents itself to the current scene root on ready, so skid marks stay in world space even if the vehicle moves.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TireData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A resource that defines tire parameters for the tanh-based tire model.
+	</brief_description>
+	<description>
+		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), and relaxation times for force smoothing.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="friction_forward" type="float" setter="set_friction_forward" getter="get_friction_forward" default="1.0">
+			Longitudinal (forward) tire friction coefficient. Higher values increase grip for acceleration and braking.
+		</member>
+		<member name="friction_lateral" type="float" setter="set_friction_lateral" getter="get_friction_lateral" default="1.0">
+			Lateral (cornering) tire friction coefficient. Higher values increase grip when turning.
+		</member>
+		<member name="forward_friction_curve" type="Curve" setter="set_forward_friction_curve" getter="get_forward_friction_curve">
+			Optional [Curve] resource for custom longitudinal friction response. Maps normalized slip velocity (0-2) to a friction multiplier. Overrides the default tanh-based model.
+		</member>
+		<member name="lateral_friction_curve" type="Curve" setter="set_lateral_friction_curve" getter="get_lateral_friction_curve">
+			Optional [Curve] resource for custom lateral friction response. Maps normalized slip angle (0-2) to a friction multiplier. Overrides the default tanh-based model.
+		</member>
+		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.3">
+			Tire radius in meters.
+		</member>
+		<member name="brake_power" type="float" setter="set_brake_power" getter="get_brake_power" default="1500.0">
+			Maximum brake torque in Newton-meters at full brake input.
+		</member>
+		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="0.1">
+			Wheel bearing and rotational drag coefficient. Higher values slow wheel spin faster.
+		</member>
+		<member name="peak_slip_angle" type="float" setter="set_peak_slip_angle" getter="get_peak_slip_angle" default="10.0">
+			Slip angle in degrees at which lateral force reaches ~76% of its maximum. Lower values (e.g. 6-8) give sharper tire bite; higher values (12-16) give softer, more progressive response.
+		</member>
+		<member name="relaxation_low" type="float" setter="set_relaxation_low" getter="get_relaxation_low" default="0.042">
+			Force relaxation time in seconds at zero speed. Lower values make the tire respond faster when stationary or slow (42 ms default).
+		</member>
+		<member name="relaxation_high" type="float" setter="set_relaxation_high" getter="get_relaxation_high" default="0.01">
+			Force relaxation time in seconds at high speed (30 m/s+). Lower values give instant force response (10 ms default).
+		</member>
+		<member name="tire_width" type="float" setter="set_tire_width" getter="get_tire_width" default="0.25">
+			Width of the tire tread in metres. Used by [TireSkid] to set the ribbon width of skid marks.
+		</member>
+	</members>
+</class>
