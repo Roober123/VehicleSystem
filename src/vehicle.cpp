@@ -199,8 +199,13 @@ void Vehicle::_apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 
 			real_t axle_df = total_df * axle->downforce_ratio;
 			if (axle_df < real_t{0.01}) continue;
 			const auto &wheels = axle->get_wheels();
-			real_t per_wheel = axle_df / wheels.size();
+			size_t grounded_wheels = 0;
+			for (auto *wh : wheels)
+				if (wh->is_on_ground()) ++grounded_wheels;
+			if (grounded_wheels == 0) continue;
+			real_t per_wheel = axle_df / static_cast<real_t>(grounded_wheels);
 			for (auto *wh : wheels) {
+				if (!wh->is_on_ground()) continue;
 				Vector3 off = wh->collision_point - body_origin;
 				apply_force(wh->collision_normal * -per_wheel, off);
 			}
@@ -213,12 +218,13 @@ void Vehicle::_update_suspension(PhysicsDirectBodyState3D *state, const Vector3 
 	for (auto& axle : axles) {
 		axle->update_physics(state, com_global, linear_velocity, angular_velocity);
 		for (auto &wh : axle->get_wheels()) {
+			if (!wh->is_on_ground()) continue;
 			Vector3 offset = wh->collision_point - body_origin;
 			apply_force(wh->collision_normal * wh->get_suspension_rebound_force(), offset);
 		}
 		// anti roll
 		const auto& wh = axle->get_wheels();
-		if (wh.size() >= 2) {
+		if (wh.size() >= 2 && wh[0]->is_on_ground() && wh[1]->is_on_ground()) {
 			real_t arb_force = axle->get_antiroll_bar_force();
 			if (std::abs(arb_force) > 0.01) {
 				Vector3 offL = wh[0]->collision_point - body_origin;

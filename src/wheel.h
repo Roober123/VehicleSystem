@@ -141,7 +141,7 @@ class Wheel : public Node3D {
     
     Vector3 tire_force;
     Vector3 cached_tire_force;
-    float reaction_torque;
+    float reaction_torque = 0.0f;
     real_t self_aligning_torque = 0.0;
     real_t slip_ratio = 0.0;
     real_t slip_angle = 0.0; // degrees

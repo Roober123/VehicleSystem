@@ -18,6 +18,9 @@ func _process(_delta: float) -> void:
 	ctrl.get_node("EngineTorqueLabel").text = "Engine Torque: %.1f Nm" % _telemetry.get_engine_torque()
 	ctrl.get_node("ThrottleLabel").text = "Throttle: %.2f" % _telemetry.get_engine_throttle()
 
+	# Turbo
+	ctrl.get_node("TurboLabel").text = "Turbo Boost: %.2f bar" % _telemetry.get_turbo_boost()
+
 	# Driveshaft
 	ctrl.get_node("DriveshaftRPMLabel").text = "Driveshaft RPM: %d" % int(_telemetry.get_driveshaft_rpm())
 

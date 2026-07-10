@@ -79,6 +79,7 @@ public:
     void add_torque(real_t torque);
     void integrate(real_t dt);
     real_t get_average_wheel_omega() const;
+    real_t get_average_wheel_angle() const;
     real_t get_total_sat() const;
 
     const std::vector<Wheel*>& get_wheels() const;

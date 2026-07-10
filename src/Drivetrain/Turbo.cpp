@@ -1,4 +1,5 @@
 #include "Turbo.h"
+#include <algorithm>
 
 void Turbo::configure(const godot::Ref<godot::TurboData>& data) {
     if (data.is_null()) return;
@@ -12,13 +13,18 @@ void Turbo::configure(const godot::Ref<godot::TurboData>& data) {
 
 real_t Turbo::update(real_t dt, real_t engine_rpm, real_t throttle) {
     real_t target_boost = 0.0;
-    if (engine_rpm > start_rpm && engine_rpm < fall_rpm) {
-        if (engine_rpm > max_boost_rpm) target_boost = throttle * max_boost;
-        else    target_boost = throttle * (max_boost_rpm - engine_rpm) / 
-                               (max_boost_rpm - start_rpm) * max_boost;
+    if (engine_rpm >= start_rpm && engine_rpm < fall_rpm) {
+        const real_t spool_range = max_boost_rpm - start_rpm;
+        real_t spool_fraction = real_t{1.0};
+        if (spool_range > real_t{1e-6}) {
+            spool_fraction = std::clamp((engine_rpm - start_rpm) / spool_range,
+                                        real_t{0.0}, real_t{1.0});
+        }
+        target_boost = throttle * max_boost * spool_fraction;
     }
     real_t grow_rate = spool_up;
     if (target_boost < boost) grow_rate = spool_down;
-    boost += (target_boost - boost) * grow_rate * dt;
+    const real_t blend = std::clamp(grow_rate * dt, real_t{0.0}, real_t{1.0});
+    boost += (target_boost - boost) * blend;
     return boost;
 }

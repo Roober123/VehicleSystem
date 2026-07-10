@@ -41,10 +41,13 @@ void ShaftWheelsCouplingConstraint::solve() {
 
     for (auto & ax : axles) {
         const real_t axle_avg = ax->get_average_wheel_omega();
-        const real_t diff = axle_avg - driveshaft->get_angular_velocity();
-        if (std::abs(diff) < real_t{1e-8}) continue;
+        const real_t angular_velocity_diff = axle_avg - driveshaft->get_angular_velocity();
+        const real_t angular_displacement = ax->get_average_wheel_angle() - driveshaft->get_angle();
+        if (std::abs(angular_velocity_diff) < real_t{1e-8} &&
+            std::abs(angular_displacement) < real_t{1e-8}) continue;
 
-        const real_t correction = (coupling_stiffness * diff + coupling_damping * diff) / axle_count;
+        const real_t correction = (coupling_stiffness * angular_velocity_diff +
+                                   coupling_damping * angular_velocity_diff) / axle_count;
         ax->add_torque(-correction);
         driveshaft->add_torque(correction);
     }

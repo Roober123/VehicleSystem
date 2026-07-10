@@ -15,7 +15,9 @@ real_t VehicleEngine::get_rpm_normalized() {
 real_t VehicleEngine::get_torque() {
 	if (torque_curve.is_null()) return 0.0;
 	real_t tq_point = get_rpm_normalized();
-	return torque_curve->sample_baked(tq_point) * throttle * max_torque * (1.0 + turbo->get_boost());
+	real_t tq = torque_curve->sample_baked(tq_point) * throttle * max_torque;
+	if (turbo != nullptr) tq *= (1.0 + turbo->get_boost());
+	return tq;
 }
 
 real_t VehicleEngine::get_available_torque() {

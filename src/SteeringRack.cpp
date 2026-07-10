@@ -4,16 +4,24 @@
 namespace godot {
 
 void SteeringRack::load(const Ref<SteeringRackData>& s) {
-    inertia = s->get_inertia();
+    configured = false;
+    if (s.is_null())
+        return;
+
+    inertia = std::max(s->get_inertia(), real_t{1e-6});
     damping = s->get_damping();
     friction_coefficient = s->get_friction_coefficient();
     max_angle = Math::deg_to_rad(s->get_max_angle());
     proportional_gain = s->get_proportional_gain();
     derivative_gain = s->get_derivative_gain();
     sat_gain = s->get_sat_gain();
+    configured = true;
 }
 
 void SteeringRack::solve(real_t steer_input, real_t sat_torque, real_t dt, real_t speed_kph) {
+    if (!configured || dt <= real_t{0.0})
+        return;
+
     real_t speed_factor = 1.0 / (1.0 + speed_kph * real_t{0.02});
 
     real_t effective_steer = steer_input * speed_factor;

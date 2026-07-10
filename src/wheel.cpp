@@ -73,6 +73,18 @@ void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vec
         sustained_mass = 0.0;
         suspension_rebound_force = 0.0;
         compression = 0.0;
+        collision_point = get_global_position();
+        collision_normal = Vector3();
+        reaction_torque = 0.0f;
+        self_aligning_torque = 0.0;
+        slip_ratio = 0.0;
+        slip_angle = 0.0;
+        is_sliding = false;
+        abs_active = false;
+        prev_longitudinal_force = 0.0;
+        prev_lateral_force = 0.0;
+        if (skid != nullptr)
+            skid->stop_skid();
         return;
     }
     on_ground = true;
@@ -97,11 +109,10 @@ void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vec
 
 void Wheel::solve_tire(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity, real_t dt, real_t brake_input, bool abs_enabled) {
     is_sliding = false;
-    if (!on_ground)
-        return;
-
     reaction_torque = 0.0f;
     self_aligning_torque = 0.0;
+    if (!on_ground)
+        return;
 
     Vector3 fwd_tangent, right_tangent;
     _compute_tangents(fwd_tangent, right_tangent);

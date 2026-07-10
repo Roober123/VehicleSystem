@@ -49,6 +49,8 @@ void Axle::_ready() {
     find_children_wheels();
     if (steering_rack_data != nullptr) {
         steering_rack.load(steering_rack_data);
+    } else if (is_steerable) {
+        UtilityFunctions::printerr("Steerable axle '", get_name(), "' has no SteeringRackData; steering is disabled.");
     }
     // Apply tire data to wheels
     if (tire_data != nullptr) {
@@ -134,6 +136,13 @@ real_t Axle::get_average_wheel_omega() const {
     return sum / wheels.size();
 }
 
+real_t Axle::get_average_wheel_angle() const {
+    if (wheels.empty()) return 0.0;
+    real_t sum = 0.0;
+    for (const auto& w : wheels) sum += w->body.get_angle();
+    return sum / wheels.size();
+}
+
 real_t Axle::get_total_sat() const {
     real_t value = 0.0;
     for (const auto& i : wheels)    value += i->self_aligning_torque;
@@ -145,6 +154,9 @@ void Axle::integrate(real_t dt) {
     for (auto& wheel : wheels)  wheel->body.integrate(dt);
 }
 void Axle::solve_steering(real_t steer_input, real_t dt, real_t speed_kph) {
+    if (!steering_rack.is_configured())
+        return;
+
     real_t sat = get_total_sat();
     real_t speed_factor = std::min(speed_kph / real_t{8.0}, real_t{1.0});
     sat *= speed_factor;
@@ -219,7 +231,7 @@ void Axle::set_wheels_rotation() {
 
     Wheel* left = wheels[0];
     Wheel* right = wheels[1];
-    if (left->get_global_position().x > right->get_global_position().x)
+    if (left->get_position().x > right->get_position().x)
         std::swap(left, right);
 
     // Ackermann formulas
@@ -231,12 +243,18 @@ void Axle::set_wheels_rotation() {
     real_t inner_angle = std::atan2(wheelbase, inner_radius);
     real_t outer_angle = std::atan2(wheelbase, outer_radius);
 
+    auto set_steer_rotation = [](Wheel* wheel, real_t angle) {
+        Vector3 rotation = wheel->get_rotation();
+        rotation.y = angle;
+        wheel->set_rotation(rotation);
+    };
+
     if (steer_angle > 0) {
-        right->set_rotation(Vector3(0, inner_angle, 0));
-        left->set_rotation(Vector3(0, outer_angle, 0));
+        set_steer_rotation(right, inner_angle);
+        set_steer_rotation(left, outer_angle);
     } else {
-        left->set_rotation(Vector3(0, -inner_angle, 0));
-        right->set_rotation(Vector3(0, -outer_angle, 0));
+        set_steer_rotation(left, -inner_angle);
+        set_steer_rotation(right, -outer_angle);
     }
 }
 
