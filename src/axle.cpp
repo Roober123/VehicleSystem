@@ -91,7 +91,7 @@ void Axle::compute_suspension_parameters(real_t mass, const Ref<SuspensionData>&
     real_t critical_damping = 2.0 * std::sqrt(stiffness * mass_per_wheel);
     real_t damping = s->damping_ratio * critical_damping;
     for (auto& i : wheels)
-        i->set_suspension(s->suspension_length, stiffness, damping);
+        i->set_suspension(s->suspension_length, stiffness, damping, average_wheel_load);
     arb_stiffness = s->antiroll_bar_stiffness;
 }
 

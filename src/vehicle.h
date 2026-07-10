@@ -43,7 +43,8 @@ class Vehicle : public RigidBody3D {
 
 protected:
 	static void _bind_methods();
-	void _apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 &angular_velocity, const Vector3 &body_origin, real_t steer_input = 0.0);
+	void _apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 &angular_velocity, const Vector3 &body_origin);
+	void _apply_downforce(real_t total_downforce, const Vector3 &body_origin);
 	void _update_suspension(PhysicsDirectBodyState3D *state, const Vector3 &body_origin, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity);
 	void _handle_auto_gearbox();
 	void _run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Vector3 &com_global, const Vector3 &linear_velocity, 

@@ -21,10 +21,11 @@ void Wheel::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_is_sliding"), &Wheel::get_is_sliding);
 }
 
-void Wheel::set_suspension(real_t suspension_length, real_t stiffness, real_t damping) {
+void Wheel::set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load) {
     this->suspension_length = suspension_length;
     this->stiffness = stiffness;
     this->damping = damping;
+    this->reference_load = std::max(reference_load, real_t{1.0});
     add_physics();
 
 } 
@@ -40,6 +41,7 @@ void Wheel::set_tire(const Ref<TireData>& t) {
     this->peak_slip_angle = t->peak_slip_angle;
     this->relaxation_low = t->relaxation_low;
     this->relaxation_high = t->relaxation_high;
+    this->load_sensitivity = t->get_load_sensitivity();
 
     // Pass tire width to the skid system
     if (skid)
@@ -204,7 +206,8 @@ real_t Wheel::_apply_abs(real_t brake_input, real_t fwd_speed, real_t dt) {
 
 void Wheel::_compute_sat(real_t lateral_force) {
     constexpr real_t base_trail = real_t{0.04}; // 40 mm
-    real_t max_lateral = sustained_mass * real_t{9.81} * friction_lateral;
+    const real_t normal = sustained_mass * real_t{9.81};
+    real_t max_lateral = normal * friction_lateral * _get_load_sensitivity_scale(normal);
     real_t load_ratio = std::abs(lateral_force) / std::max(max_lateral, real_t{1e-6});
     load_ratio = std::min(load_ratio, real_t{1.0});
     real_t trail = base_trail * (real_t{1.0} - load_ratio) * (real_t{1.0} - load_ratio);
@@ -247,6 +250,10 @@ void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angl
     fwd_mu = friction_forward;
     lat_mu = friction_lateral;
 
+    const real_t load_scale = _get_load_sensitivity_scale(normal);
+    fwd_mu *= load_scale;
+    lat_mu *= load_scale;
+
     if (std::abs(fwd_speed) + std::abs(lat_speed) < real_t{1.0}) {
         fwd_mu *= real_t{1.3};
         lat_mu *= real_t{1.3};
@@ -273,8 +280,9 @@ void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angl
 real_t Wheel::_combine_forces(real_t raw_fwd, real_t raw_lat, real_t normal,
                                real_t fwd_mu, real_t lat_mu,
                                real_t& out_fwd, real_t& out_lat) const {
-    real_t nx = raw_lat / (lat_mu * normal);
-    real_t ny = raw_fwd / (fwd_mu * normal);
+    constexpr real_t min_mu = real_t{1e-6};
+    real_t nx = lat_mu > min_mu ? raw_lat / (lat_mu * normal) : real_t{0.0};
+    real_t ny = fwd_mu > min_mu ? raw_fwd / (fwd_mu * normal) : real_t{0.0};
     real_t sum = std::sqrt(nx * nx + ny * ny);
 
     out_fwd = raw_fwd;
@@ -285,6 +293,12 @@ real_t Wheel::_combine_forces(real_t raw_fwd, real_t raw_lat, real_t normal,
         out_lat *= r;
     }
     return sum;
+}
+
+real_t Wheel::_get_load_sensitivity_scale(real_t normal_load) const {
+    const real_t load_ratio = std::max(normal_load / reference_load, real_t{1e-3});
+    const real_t scale = std::pow(load_ratio, -load_sensitivity);
+    return std::clamp(scale, real_t{0.75}, real_t{1.25});
 }
 
 void Wheel::_apply_relaxation(real_t& longitudinal_force, real_t& lateral_force,

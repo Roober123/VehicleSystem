@@ -136,8 +136,7 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
 
 	_update_suspension(state, body_origin, com_global, linear_velocity, angular_velocity);
 
-	aerodynamics.compute(linear_velocity);
-	_apply_aerodynamics(linear_velocity, angular_velocity, body_origin, steer_input);
+	_apply_aerodynamics(linear_velocity, angular_velocity, body_origin);
 
 	_handle_auto_gearbox();
 
@@ -176,27 +175,22 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
 }
 
 
-void Vehicle::_apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 &angular_velocity, const Vector3 &body_origin, real_t steer_input) {
-	real_t speed_mag = linear_velocity.length();
-	if (speed_mag > real_t{0.1}) {
-		Vector3 drag_dir = -linear_velocity / speed_mag;
-		apply_central_force(drag_dir * aerodynamics.get_drag_force());
-	}
+void Vehicle::_apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 &angular_velocity, const Vector3 &body_origin) {
+	const AerodynamicsState state = aerodynamics.get_state(
+		get_global_transform().basis, linear_velocity, angular_velocity, get_mass(), axles);
+	const AerodynamicForces forces = aerodynamics.compute(state);
 
-	real_t yaw_rate = angular_velocity.y;
-	if (std::abs(yaw_rate) > real_t{0.001}) {
-		real_t blend = real_t{1.0} - std::abs(steer_input);
-		blend *= blend;
-		real_t yaw_torque_y = -get_mass() * yaw_rate * std::abs(yaw_rate)
-		                    * aerodynamics.get_yaw_damping_coefficient() * blend;
-		apply_torque(Vector3(0.0, yaw_torque_y, 0.0));
-	}
-	
+	if (forces.drag.length_squared() > real_t{1e-8})
+		apply_central_force(forces.drag);
+	if (forces.yaw_control_torque.length_squared() > real_t{1e-8})
+		apply_torque(forces.yaw_control_torque);
+	_apply_downforce(forces.downforce, body_origin);
+}
 
-	real_t total_df = aerodynamics.get_downforce();
-	if (total_df > real_t{0.01}) {
+void Vehicle::_apply_downforce(real_t total_downforce, const Vector3 &body_origin) {
+	if (total_downforce > real_t{0.01}) {
 		for (auto *axle : axles) {
-			real_t axle_df = total_df * axle->downforce_ratio;
+			real_t axle_df = total_downforce * axle->downforce_ratio;
 			if (axle_df < real_t{0.01}) continue;
 			const auto &wheels = axle->get_wheels();
 			size_t grounded_wheels = 0;
@@ -258,7 +252,7 @@ void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Ve
 		engine.integrate(sub_dt);
 		drive_shaft.integrate(sub_dt);
 
-		for (auto &axle : axles)
+		for(auto &axle : axles)
 			axle->integrate(sub_dt);
 	}
 }

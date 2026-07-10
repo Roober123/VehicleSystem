@@ -1,4 +1,5 @@
 #include "tire_data.h"
+#include <algorithm>
 
 namespace godot {
 
@@ -48,6 +49,10 @@ void TireData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_tire_width", "value"), &TireData::set_tire_width);
     ClassDB::bind_method(D_METHOD("get_tire_width"), &TireData::get_tire_width);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "tire_width", PROPERTY_HINT_RANGE, "0.05,1.0,0.01,metres"), "set_tire_width", "get_tire_width");
+
+    ClassDB::bind_method(D_METHOD("set_load_sensitivity", "value"), &TireData::set_load_sensitivity);
+    ClassDB::bind_method(D_METHOD("get_load_sensitivity"), &TireData::get_load_sensitivity);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "load_sensitivity", PROPERTY_HINT_RANGE, "0.0,0.3,0.01"), "set_load_sensitivity", "get_load_sensitivity");
 }
 
 void TireData::set_friction_forward(real_t value) { friction_forward = value; }
@@ -82,5 +87,8 @@ real_t TireData::get_relaxation_high() { return relaxation_high; }
 
 void TireData::set_tire_width(real_t value) { tire_width = value; }
 real_t TireData::get_tire_width() { return tire_width; }
+
+void TireData::set_load_sensitivity(real_t value) { load_sensitivity = std::clamp(value, real_t{0.0}, real_t{0.3}); }
+real_t TireData::get_load_sensitivity() const { return load_sensitivity; }
 
 }

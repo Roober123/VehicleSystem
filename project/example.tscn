@@ -28,18 +28,20 @@ point_count = 3
 [sub_resource type="VehicleEngineData" id="VehicleEngineData_l7kk7"]
 torque_curve = SubResource("Curve_n51mc")
 redline_rpm = 6000.0
-inertia = 0.3
 max_torque = 500.0
 engine_braking = 0.3
 
 [sub_resource type="GearboxData" id="GearboxData_c52e2"]
 gear_ratios = PackedFloat64Array(5, 3, 2.2, 1.6, 1.2, 0.9)
 final_drive = 3.0
-clutch_max_torque = 500.0
+clutch_max_torque = 2106.0
 auto_mode = false
 
 [sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_gi0ev"]
 yaw_damping_coefficient = 1.0
+
+[sub_resource type="TurboData" id="TurboData_t7sij"]
+max_boost = 3.0
 
 [sub_resource type="Curve" id="Curve_ei00m"]
 _limits = [0.0, 1.0, 0.0, 2.0]
@@ -105,7 +107,8 @@ suspension_data = SubResource("SuspensionData_yivbd")
 engine_data = SubResource("VehicleEngineData_l7kk7")
 gearbox_data = SubResource("GearboxData_c52e2")
 aero_data = SubResource("VehicleAerodynamicsData_gi0ev")
-substeps = 2
+turbo_data = SubResource("TurboData_t7sij")
+substeps = 3
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6853267, 1.5508447)
 mass = 1500.0
 center_of_mass_mode = 1

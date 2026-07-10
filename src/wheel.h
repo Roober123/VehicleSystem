@@ -28,6 +28,8 @@ class Wheel : public Node3D {
     real_t friction_forward = 1.0;
     real_t friction_lateral = 1.0;
     real_t brake_power = 1500.0;
+    real_t reference_load = 1.0;
+    real_t load_sensitivity = 0.10;
 
     // tanh tire model parameters
     real_t peak_slip_angle = 10.0;     // degrees
@@ -89,7 +91,7 @@ class Wheel : public Node3D {
 
     RayCast3D *ray = nullptr;
     TireSkid *skid = nullptr;
-    void set_suspension(real_t suspension_length, real_t stiffness, real_t damping);
+    void set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load);
     void set_tire(const Ref<TireData>& t);
     /// Returns the current suspension rebound force in Newtons.
     real_t get_suspension_rebound_force() const { return suspension_rebound_force; }
@@ -158,6 +160,7 @@ class Wheel : public Node3D {
     bool abs_active = false;
     real_t abs_accumulator = 0.0;
     real_t _apply_abs(real_t brake_input, real_t fwd_speed, real_t dt);
+    real_t _get_load_sensitivity_scale(real_t normal_load) const;
 };
 
 }

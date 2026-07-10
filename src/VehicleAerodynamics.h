@@ -1,9 +1,30 @@
 #pragma once
 #include "godot_cpp/variant/vector3.hpp"
+#include "godot_cpp/variant/basis.hpp"
 #include "godot_cpp/classes/resource.hpp"
 #include "Resources/vehicle_aerodynamics_data.h"
+#include <vector>
 
 namespace godot {
+
+class Axle;
+
+struct AerodynamicsState {
+    Basis body_basis;
+    Vector3 linear_velocity;
+    Vector3 angular_velocity;
+    real_t vehicle_mass = 0.0;
+    real_t wheelbase = 0.0;
+    real_t trackwidth = 0.0;
+    real_t steer_angle = 0.0;
+    int grounded_wheels = 0;
+};
+
+struct AerodynamicForces {
+    Vector3 drag;
+    Vector3 yaw_control_torque;
+    real_t downforce = 0.0;
+};
 
 class VehicleAerodynamics {
     
@@ -12,21 +33,24 @@ class VehicleAerodynamics {
 
     real_t drag_coefficient = 0.35;
     real_t downforce_coefficient = 0.15;
+    // Retains the old serialized name, but now controls desired-yaw feedback.
     real_t yaw_damping_coefficient = 2.0;
+    real_t yaw_control_min_speed = 3.0;
+    real_t yaw_control_max_torque = 6000.0;
+    real_t yaw_control_max_lateral_acceleration = 9.81;
 
-    real_t drag_force = 0.0;
-    real_t downforce = 0.0;
-    real_t yaw_damping_factor = 0.0; // torque per rad/s of yaw
+    Vector3 _compute_drag(const Vector3 &linear_velocity, real_t dynamic_pressure) const;
+    Vector3 _compute_yaw_control(const AerodynamicsState &state) const;
 
 public:
-    void compute(const Vector3 &linear_velocity);
-    real_t get_yaw_torque(real_t yaw_rate, real_t vehicle_mass) const;
+    AerodynamicsState get_state(const Basis &body_basis,
+                                const Vector3 &linear_velocity,
+                                const Vector3 &angular_velocity,
+                                real_t vehicle_mass,
+                                const std::vector<Axle*> &axles) const;
+    AerodynamicForces compute(const AerodynamicsState &state) const;
 
     void load_parameters(const Ref<VehicleAerodynamicsData>& a);
-    real_t get_drag_force() const { return drag_force; }
-    real_t get_downforce() const { return downforce; }
-    real_t get_yaw_damping_factor() const { return yaw_damping_factor; }
-
     void set_drag_coefficient(real_t v) { drag_coefficient = v; }
     real_t get_drag_coefficient() const { return drag_coefficient; }
 
