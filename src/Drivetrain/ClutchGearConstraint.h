@@ -23,7 +23,7 @@ class ClutchGearConstraint {
 	RotationalBody* get_output() const  { return output; }
 
 	real_t get_effective_ratio() const;
-	void solve(real_t dt, real_t engine_torque, real_t reflected_load_torque);
+	void solve(real_t dt, real_t accumulated_engine_torque, real_t reflected_load_torque);
 };
 
 }

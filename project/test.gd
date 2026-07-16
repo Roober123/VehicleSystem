@@ -2,9 +2,11 @@ extends Node3D
 
 
 var _telemetry: Node = null
+var _returning_to_menu := false
 
 func _ready() -> void:
 	_telemetry = $Vehicle/VehicleTelemetry
+	$NavigationLayer/NavigationPanel/BackToMenuButton.pressed.connect(_return_to_menu)
 
 
 func _process(_delta: float) -> void:
@@ -60,3 +62,19 @@ func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("shift_down"):
 		shift_input = -1
 	$Vehicle.set_shift_input(shift_input)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("return_to_menu") or event.is_action_pressed("ui_cancel"):
+		_return_to_menu()
+		get_viewport().set_input_as_handled()
+
+
+func _return_to_menu() -> void:
+	if _returning_to_menu:
+		return
+	_returning_to_menu = true
+	var result := get_tree().change_scene_to_file("res://main_menu.tscn")
+	if result != OK:
+		_returning_to_menu = false
+		push_error("Unable to return to the main menu (error %d)." % result)

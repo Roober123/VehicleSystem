@@ -1,0 +1,201 @@
+[gd_scene format=3 uid="uid://rejd7kky7kpi"]
+
+[ext_resource type="Script" uid="uid://c850ale01k0os" path="res://options.gd" id="1_options"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_background"]
+bg_color = Color(0.025, 0.039, 0.067, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.071, 0.106, 0.165, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.188, 0.643, 0.78, 0.72)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 16
+
+[sub_resource type="LabelSettings" id="LabelSettings_title"]
+font_size = 34
+font_color = Color(0.78, 0.94, 1, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_body"]
+font_size = 17
+font_color = Color(0.7, 0.78, 0.86, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.11, 0.192, 0.282, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button_pressed"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.08, 0.24, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button_hover"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.145, 0.353, 0.478, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.82, 0.96, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Options" type="Control" unique_id=1737590651]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_options")
+
+[node name="Background" type="Panel" parent="." unique_id=430995972]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_background")
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=841303995]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="OptionsPanel" type="PanelContainer" parent="CenterContainer" unique_id=1850377908]
+custom_minimum_size = Vector2(700, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/OptionsPanel" unique_id=246390053]
+layout_mode = 2
+theme_override_constants/margin_left = 46
+theme_override_constants/margin_top = 42
+theme_override_constants/margin_right = 46
+theme_override_constants/margin_bottom = 42
+
+[node name="Content" type="VBoxContainer" parent="CenterContainer/OptionsPanel/MarginContainer" unique_id=421595381]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1458726797]
+layout_mode = 2
+text = "Options"
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1188156072]
+layout_mode = 2
+text = "Display settings apply immediately for this session."
+label_settings = SubResource("LabelSettings_body")
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1117262566]
+layout_mode = 2
+
+[node name="WindowModeRow" type="HBoxContainer" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=728898243]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="WindowModeLabel" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content/WindowModeRow" unique_id=2064608625]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Window Mode"
+vertical_alignment = 1
+
+[node name="WindowModeOption" type="OptionButton" parent="CenterContainer/OptionsPanel/MarginContainer/Content/WindowModeRow" unique_id=664794398]
+custom_minimum_size = Vector2(220, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_neighbor_bottom = NodePath("../VSyncRow/VSyncToggle")
+
+[node name="VSyncRow" type="HBoxContainer" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1766605671]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="VSyncLabel" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content/VSyncRow" unique_id=1300599265]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Vertical Sync"
+vertical_alignment = 1
+
+[node name="VSyncToggle" type="CheckButton" parent="CenterContainer/OptionsPanel/MarginContainer/Content/VSyncRow" unique_id=1575123575]
+custom_minimum_size = Vector2(220, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Enabled"
+
+[node name="ControlsTitle" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1753410173]
+layout_mode = 2
+text = "Controls"
+label_settings = SubResource("LabelSettings_body")
+
+[node name="Controls" type="Label" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1401988623]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+text = "W / Up                 Throttle
+S / Down               Brake / Reverse
+A / D or Left / Right  Steering
+Shift / Ctrl      Shift Up / Down
+Escape                 Return to Menu"
+label_settings = SubResource("LabelSettings_body")
+vertical_alignment = 1
+
+[node name="ButtonSeparator" type="Control" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1543024656]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+
+[node name="ResetButton" type="Button" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1949382884]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_button")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+text = "Reset Defaults"
+
+[node name="BackButton" type="Button" parent="CenterContainer/OptionsPanel/MarginContainer/Content" unique_id=1604155701]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_button")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+text = "Back"
+
+[connection signal="item_selected" from="CenterContainer/OptionsPanel/MarginContainer/Content/WindowModeRow/WindowModeOption" to="." method="_on_window_mode_option_item_selected"]
+[connection signal="toggled" from="CenterContainer/OptionsPanel/MarginContainer/Content/VSyncRow/VSyncToggle" to="." method="_on_vsync_toggle_toggled"]
+[connection signal="pressed" from="CenterContainer/OptionsPanel/MarginContainer/Content/ResetButton" to="." method="_on_reset_button_pressed"]
+[connection signal="pressed" from="CenterContainer/OptionsPanel/MarginContainer/Content/BackButton" to="." method="_on_back_button_pressed"]

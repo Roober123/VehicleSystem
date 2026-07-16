@@ -1,0 +1,161 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://main_menu.gd" id="1_menu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_background"]
+bg_color = Color(0.025, 0.039, 0.067, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.071, 0.106, 0.165, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.188, 0.643, 0.78, 0.72)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button"]
+bg_color = Color(0.11, 0.192, 0.282, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 12.0
+content_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button_hover"]
+bg_color = Color(0.145, 0.353, 0.478, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.82, 0.96, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 12.0
+content_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button_pressed"]
+bg_color = Color(0.08, 0.24, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 12.0
+content_margin_bottom = 12.0
+
+[sub_resource type="LabelSettings" id="LabelSettings_title"]
+font_size = 42
+font_color = Color(0.78, 0.94, 1, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_body"]
+font_size = 18
+font_color = Color(0.7, 0.78, 0.86, 1)
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBox_background")
+mouse_filter = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuPanel" type="PanelContainer" parent="CenterContainer"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/MenuPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 46
+theme_override_constants/margin_top = 42
+theme_override_constants/margin_right = 46
+theme_override_constants/margin_bottom = 42
+
+[node name="Content" type="VBoxContainer" parent="CenterContainer/MenuPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+layout_mode = 2
+text = "VehicleSystem Showcase"
+horizontal_alignment = 1
+label_settings = SubResource("LabelSettings_title")
+
+[node name="Description" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+custom_minimum_size = Vector2(0, 68)
+layout_mode = 2
+text = "Explore the native Godot vehicle simulation,\ndrivetrain telemetry, tires, suspension, and control systems."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+label_settings = SubResource("LabelSettings_body")
+
+[node name="Spacer" type="Control" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="LaunchButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.97, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBox_button")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+text = "Launch Test Scene"
+
+[node name="OptionsButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBox_button")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+text = "Options"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBox_button")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+text = "Quit"
+
+[connection signal="pressed" from="CenterContainer/MenuPanel/MarginContainer/Content/LaunchButton" to="." method="_on_launch_button_pressed"]
+[connection signal="pressed" from="CenterContainer/MenuPanel/MarginContainer/Content/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="CenterContainer/MenuPanel/MarginContainer/Content/QuitButton" to="." method="_on_quit_button_pressed"]

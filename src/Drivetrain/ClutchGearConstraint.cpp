@@ -15,7 +15,7 @@ real_t ClutchGearConstraint::get_effective_ratio() const {
 	return gear_ratios[index] * final_drive;
 }
 
-void ClutchGearConstraint::solve(real_t dt, real_t engine_torque, real_t reflected_load_torque) {
+void ClutchGearConstraint::solve(real_t dt, real_t accumulated_engine_torque, real_t reflected_load_torque) {
 	if (engine == nullptr || output == nullptr)
 		return;
 
@@ -31,11 +31,11 @@ void ClutchGearConstraint::solve(real_t dt, real_t engine_torque, real_t reflect
 
 	const real_t I_total   = I_e + I_ref;
 	const real_t momentum  = I_e * angular_velocity_e + I_ref * angular_velocity_ref;
-	const real_t torque_net= engine_torque - reflected_load_torque;
+	const real_t torque_net= accumulated_engine_torque - reflected_load_torque;
 	const real_t angular_velocity_target  = (momentum + torque_net * dt) / I_total;
 
 
-	real_t torque_c = engine_torque - I_e * (angular_velocity_target - angular_velocity_e) / dt;
+	real_t torque_c = accumulated_engine_torque - I_e * (angular_velocity_target - angular_velocity_e) / dt;
 
 	const real_t capacity = clutch_engagement * clutch_max_torque;
 	torque_c = std::clamp(torque_c, -capacity, capacity);

@@ -25,6 +25,7 @@ public:
 	real_t get_angle() const { return angle; }
 	real_t get_inertia() const { return inertia; }
 	real_t get_torque() const { return torque; }
+	real_t get_accumulated_torque() const { return torque; }
 };
 
 }

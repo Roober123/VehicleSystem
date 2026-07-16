@@ -4,6 +4,8 @@
 namespace godot {
 
 void Vehicle::_bind_methods() {
+    ADD_SIGNAL(MethodInfo("vehicle_ready"));
+
     ClassDB::bind_method(D_METHOD("set_suspension_data", "data"), &Vehicle::set_suspension_data);
     ClassDB::bind_method(D_METHOD("get_suspension_data"), &Vehicle::get_suspension_data);
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "suspension_data", PROPERTY_HINT_RESOURCE_TYPE, "SuspensionData"),
@@ -121,6 +123,7 @@ void Vehicle::_ready() {
 	shaft_wheels_coupling.load_bodies(&drive_shaft, axles);
 
 	_compute_axle_dimensions();
+	emit_signal("vehicle_ready");
 }
 
 void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
@@ -235,7 +238,9 @@ void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Ve
 
 	for (int s = 0; s < substeps; ++s) {
 		engine.accumulate_torque(sub_dt);
-		clutch_gearbox.solve(sub_dt, engine.get_torque(), prev_reflected_load);
+		// VehicleEngine::get_torque() reports curve/throttle torque only. The
+		// accumulator also contains rev-cut, friction, engine braking and idle torque.
+		clutch_gearbox.solve(sub_dt, engine.get_accumulated_torque(), prev_reflected_load);
 		shaft_wheels_coupling.solve();
 
 		for (auto &ax : axles) {
