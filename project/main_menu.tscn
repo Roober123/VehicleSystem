@@ -1,17 +1,13 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3 uid="uid://cfv6lopriup0k"]
 
-[ext_resource type="Script" path="res://main_menu.gd" id="1_menu"]
+[ext_resource type="Script" uid="uid://vl12uq4pvfx8" path="res://main_menu.gd" id="1_menu"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_background"]
 bg_color = Color(0.025, 0.039, 0.067, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
-bg_color = Color(0.071, 0.106, 0.165, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.188, 0.643, 0.78, 0.72)
+bg_color = Color(0.15487596, 0.154876, 0.15487587, 1)
+border_color = Color(0.1742624, 0.6167282, 0.7495313, 0.72156864)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
@@ -19,18 +15,41 @@ corner_radius_bottom_left = 12
 shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 16
 
+[sub_resource type="LabelSettings" id="LabelSettings_title"]
+font_size = 42
+font_color = Color(0.78, 0.94, 1, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_body"]
+font_size = 18
+font_color = Color(0.7, 0.78, 0.86, 1)
+
 [sub_resource type="StyleBoxFlat" id="StyleBox_button"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
 bg_color = Color(0.11, 0.192, 0.282, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_button_pressed"]
 content_margin_left = 18.0
-content_margin_right = 18.0
 content_margin_top = 12.0
+content_margin_right = 18.0
 content_margin_bottom = 12.0
+bg_color = Color(0.08, 0.24, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_button_hover"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
 bg_color = Color(0.145, 0.353, 0.478, 1)
 border_width_left = 1
 border_width_top = 1
@@ -41,31 +60,8 @@ corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
-content_margin_left = 18.0
-content_margin_right = 18.0
-content_margin_top = 12.0
-content_margin_bottom = 12.0
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_button_pressed"]
-bg_color = Color(0.08, 0.24, 0.34, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-content_margin_left = 18.0
-content_margin_right = 18.0
-content_margin_top = 12.0
-content_margin_bottom = 12.0
-
-[sub_resource type="LabelSettings" id="LabelSettings_title"]
-font_size = 42
-font_color = Color(0.78, 0.94, 1, 1)
-
-[sub_resource type="LabelSettings" id="LabelSettings_body"]
-font_size = 18
-font_color = Color(0.7, 0.78, 0.86, 1)
-
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=1300967383]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -74,17 +70,17 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="Panel" parent="."]
+[node name="Background" type="Panel" parent="." unique_id=1183188445]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBox_background")
 mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_background")
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=985827719]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -92,68 +88,69 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MenuPanel" type="PanelContainer" parent="CenterContainer"]
+[node name="MenuPanel" type="PanelContainer" parent="CenterContainer" unique_id=2126297999]
 custom_minimum_size = Vector2(560, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBox_panel")
 
-[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/MenuPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/MenuPanel" unique_id=353132913]
 layout_mode = 2
 theme_override_constants/margin_left = 46
 theme_override_constants/margin_top = 42
 theme_override_constants/margin_right = 46
 theme_override_constants/margin_bottom = 42
 
-[node name="Content" type="VBoxContainer" parent="CenterContainer/MenuPanel/MarginContainer"]
+[node name="Content" type="VBoxContainer" parent="CenterContainer/MenuPanel/MarginContainer" unique_id=1042482314]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="Title" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=1550118091]
 layout_mode = 2
 text = "VehicleSystem Showcase"
-horizontal_alignment = 1
 label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
 
-[node name="Description" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="Description" type="Label" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=57032745]
 custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
-text = "Explore the native Godot vehicle simulation,\ndrivetrain telemetry, tires, suspension, and control systems."
+text = "Explore the native Godot vehicle simulation,
+drivetrain telemetry, tires, suspension, and control systems."
+label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
-label_settings = SubResource("LabelSettings_body")
 
-[node name="Spacer" type="Control" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="Spacer" type="Control" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=138351358]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 
-[node name="LaunchButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="LaunchButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=258781890]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.97, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBox_button")
-theme_override_styles/hover = SubResource("StyleBox_button_hover")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
 text = "Launch Test Scene"
 
-[node name="OptionsButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="OptionsButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=2138183828]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBox_button")
-theme_override_styles/hover = SubResource("StyleBox_button_hover")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
 text = "Options"
 
-[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content"]
+[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MarginContainer/Content" unique_id=1269834192]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBox_button")
-theme_override_styles/hover = SubResource("StyleBox_button_hover")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
 text = "Quit"
 
 [connection signal="pressed" from="CenterContainer/MenuPanel/MarginContainer/Content/LaunchButton" to="." method="_on_launch_button_pressed"]

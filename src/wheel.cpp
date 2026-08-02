@@ -72,8 +72,7 @@ void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vec
     ray->force_raycast_update();
     if (!ray->is_colliding()) {
         on_ground = false;
-        sustained_mass = 0.0;
-        suspension_rebound_force = 0.0;
+        set_normal_force(0.0);
         compression = 0.0;
         collision_point = get_global_position();
         collision_normal = Vector3();
@@ -92,20 +91,27 @@ void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vec
     on_ground = true;
     collision_point = ray->get_collision_point();
     collision_normal = ray->get_collision_normal();
-    compression = suspension_length - ray->get_global_position().distance_to(collision_point);
+    compression = std::clamp(
+        suspension_length - ray->get_global_position().distance_to(collision_point),
+        real_t{0.0}, suspension_length);
     
     Vector3 velocity_at_point = linear_velocity + angular_velocity.cross(
                                 (collision_point - com_global));
     real_t velocity_along_normal = velocity_at_point.dot(collision_normal);
 
-    suspension_rebound_force = compression * stiffness - damping * velocity_along_normal;
-    sustained_mass = compression * stiffness / 9.81;
-    if (sustained_mass < 0.0) sustained_mass = 0.0;
+    const real_t spring_force = compression * stiffness;
+    const real_t damper_force = -damping * velocity_along_normal;
+    set_normal_force(spring_force + damper_force);
 
     forward_vector = get_global_transform().basis.get_column(2); // Z forward
     right_vector = get_global_transform().basis.get_column(0); // X right
     up_vector = get_global_transform().basis.get_column(1); // Y up
 
+}
+
+void Wheel::set_normal_force(real_t force) {
+    suspension_rebound_force = std::max(force, real_t{0.0});
+    sustained_mass = suspension_rebound_force / real_t{9.81};
 }
 
 
@@ -127,6 +133,12 @@ void Wheel::solve_tire(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &c
     _compute_slip(fwd_speed, lat_speed, slip_vel, slip_angle_rad);
 
     real_t normal = _compute_normal_force();
+    if (normal <= real_t{1e-6}) {
+        prev_longitudinal_force = 0.0;
+        prev_lateral_force = 0.0;
+        _apply_brakes(brake_input, abs_enabled, fwd_speed, dt, normal, fwd_tangent);
+        return;
+    }
 
     real_t raw_fwd_force, raw_lat_force, fwd_mu, lat_mu;
     _compute_raw_forces(normal, slip_vel, slip_angle_rad, fwd_speed, lat_speed,
@@ -206,7 +218,7 @@ real_t Wheel::_apply_abs(real_t brake_input, real_t fwd_speed, real_t dt) {
 
 void Wheel::_compute_sat(real_t lateral_force) {
     constexpr real_t base_trail = real_t{0.04}; // 40 mm
-    const real_t normal = sustained_mass * real_t{9.81};
+    const real_t normal = _compute_normal_force();
     real_t max_lateral = normal * friction_lateral * _get_load_sensitivity_scale(normal);
     real_t load_ratio = std::abs(lateral_force) / std::max(max_lateral, real_t{1e-6});
     load_ratio = std::min(load_ratio, real_t{1.0});
@@ -235,9 +247,7 @@ void Wheel::_compute_slip(real_t fwd_speed, real_t lat_speed, real_t& slip_vel, 
 }
 
 real_t Wheel::_compute_normal_force() const {
-    real_t normal = sustained_mass * real_t{9.81};
-    if (normal < real_t{1.0}) normal = real_t{1.0};
-    return normal;
+    return suspension_rebound_force;
 }
 
 void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angle_rad,

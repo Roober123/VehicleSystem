@@ -113,12 +113,6 @@ void Vehicle::_ready() {
 	for (auto& i : axles)
 		i->compute_suspension_parameters(mass_per_axle, suspension_data);
 
-	// Add rotational drag to wheels to prevent drivetrain oscillation
-	for (auto& axle : axles) {
-		for (auto* wh : axle->get_wheels()) {
-			wh->body.set_drag(real_t{0.05});
-		}
-	}
 
 	shaft_wheels_coupling.load_bodies(&drive_shaft, axles);
 
@@ -214,21 +208,24 @@ void Vehicle::_apply_downforce(real_t total_downforce, const Vector3 &body_origi
 void Vehicle::_update_suspension(PhysicsDirectBodyState3D *state, const Vector3 &body_origin, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity) {
 	for (auto& axle : axles) {
 		axle->update_physics(state, com_global, linear_velocity, angular_velocity);
-		for (auto &wh : axle->get_wheels()) {
-			if (!wh->is_on_ground()) continue;
-			Vector3 offset = wh->collision_point - body_origin;
-			apply_force(wh->collision_normal * wh->get_suspension_rebound_force(), offset);
+
+		const auto& wheels = axle->get_wheels();
+		if (wheels.size() >= 2 && wheels[0]->is_on_ground() && wheels[1]->is_on_ground()) {
+			const real_t force_0 = wheels[0]->get_suspension_rebound_force();
+			const real_t force_1 = wheels[1]->get_suspension_rebound_force();
+
+			// An anti-roll bar transfers load across the axle; it must neither pull
+			// against the ground nor create net vertical force when a wheel unloads.
+			const real_t arb_force = std::clamp(
+				axle->get_antiroll_bar_force(), -force_1, force_0);
+			wheels[0]->set_normal_force(force_0 - arb_force);
+			wheels[1]->set_normal_force(force_1 + arb_force);
 		}
-		// anti roll
-		const auto& wh = axle->get_wheels();
-		if (wh.size() >= 2 && wh[0]->is_on_ground() && wh[1]->is_on_ground()) {
-			real_t arb_force = axle->get_antiroll_bar_force();
-			if (std::abs(arb_force) > 0.01) {
-				Vector3 offL = wh[0]->collision_point - body_origin;
-				Vector3 offR = wh[1]->collision_point - body_origin;
-				apply_force(wh[0]->collision_normal * -arb_force, offL);
-				apply_force(wh[1]->collision_normal * arb_force, offR);
-			}
+
+		for (auto *wheel : wheels) {
+			if (!wheel->is_on_ground()) continue;
+			Vector3 offset = wheel->collision_point - body_origin;
+			apply_force(wheel->collision_normal * wheel->get_suspension_rebound_force(), offset);
 		}
 	}
 }

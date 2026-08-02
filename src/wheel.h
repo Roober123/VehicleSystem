@@ -93,8 +93,10 @@ class Wheel : public Node3D {
     TireSkid *skid = nullptr;
     void set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load);
     void set_tire(const Ref<TireData>& t);
-    /// Returns the current suspension rebound force in Newtons.
+    /// Returns the final non-tensile contact force, including anti-roll load transfer.
     real_t get_suspension_rebound_force() const { return suspension_rebound_force; }
+    /// Sets the final normal contact force used by both suspension and tire forces.
+    void set_normal_force(real_t force);
     real_t get_stiffness() const { return stiffness; }
     /// Returns the wheel's angular velocity in rad/s.
     real_t get_angular_velocity() const { return body.get_angular_velocity(); }
