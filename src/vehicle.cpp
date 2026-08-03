@@ -1,5 +1,6 @@
 #include "vehicle.h"
 #include <algorithm>
+#include <cmath>
 
 namespace godot {
 
@@ -146,7 +147,10 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
 	const real_t dt = state->get_step();
 	const real_t sub_dt = dt / substeps;
 
-	gearbox_module.update(dt, brake_input, throttle_input);
+	// Gear selection is evaluated once at frame time.  Clutch phase progress is
+	// advanced inside each drivetrain substep below so disengagement, dwell, and
+	// re-engagement are independent of the configured substep count.
+	gearbox_module.update_shifting_logic(dt);
 
 	const real_t wheel_brake = (gearbox_module.get_current_gear() < 0) ? throttle_input : brake_input;
 	const real_t speed_kph = get_speed_kph();
@@ -231,15 +235,19 @@ void Vehicle::_update_suspension(PhysicsDirectBodyState3D *state, const Vector3 
 }
 
 void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity, real_t sub_dt, real_t wheel_brake, real_t speed_kph, bool abs_enabled) {
-	real_t prev_reflected_load = 0.0; // estimate from previous substep (0 for first)
+	_begin_reflected_load_frame();
 
 	for (int s = 0; s < substeps; ++s) {
+		gearbox_module.update_clutch_logic(sub_dt, wheel_brake, throttle_input);
+		// A substep can complete the gear-change dwell.  Revalidate the
+		// reflected-load coordinate immediately so an old-ratio estimate cannot
+		// reach the clutch solve below.
+		_begin_reflected_load_frame();
 		engine.accumulate_torque(sub_dt);
-		// VehicleEngine::get_torque() reports curve/throttle torque only. The
-		// accumulator also contains rev-cut, friction, engine braking and idle torque.
-		clutch_gearbox.solve(sub_dt, engine.get_accumulated_torque(), prev_reflected_load);
-		shaft_wheels_coupling.solve();
-
+		// Solve steering and tires before the drivetrain projection. This leaves
+		// current tire and brake reaction torques on the wheel bodies so the
+		// simultaneous shaft-plus-driven-wheel prediction sees the same pending
+		// loads that will be integrated for this substep.
 		for (auto &ax : axles) {
 			if (ax->is_steerable) {
 				ax->solve_steering(steer_input, sub_dt, speed_kph);
@@ -248,8 +256,23 @@ void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Ve
 			ax->solve_tire(state, com_global, linear_velocity, angular_velocity, sub_dt, wheel_brake, abs_enabled);
 		}
 
-		// for clutch in next frame
-		prev_reflected_load = _compute_reflected_load();
+		// Refresh for diagnostics and the next frame's topology lifecycle. The
+		// current reaction is already pending on the wheel body and must not also
+		// be fed to ClutchGearConstraint as an engine-side reflected load.
+		_refresh_reflected_load_cache();
+
+		// VehicleEngine::get_torque() reports curve/throttle torque only. The
+		// accumulator also contains rev-cut, friction, engine braking and idle
+		// torque. Predict clutch slip against the physical shaft+driven-wheel
+		// aggregate without re-injecting the same current tire reaction through
+		// the reflected-load argument; ShaftWheelsCouplingConstraint consumes it
+		// directly below.
+		clutch_gearbox.set_aggregate_output_state(
+			shaft_wheels_coupling.get_aggregate_inertia(),
+			shaft_wheels_coupling.get_predicted_aggregate_angular_velocity(sub_dt));
+		clutch_gearbox.solve(sub_dt, engine.get_accumulated_torque(), real_t{0.0});
+		clutch_gearbox.clear_aggregate_output_state();
+		shaft_wheels_coupling.solve(sub_dt);
 
 		engine.integrate(sub_dt);
 		drive_shaft.integrate(sub_dt);
@@ -259,15 +282,72 @@ void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Ve
 	}
 }
 
+bool Vehicle::_has_reflected_load_topology(real_t ratio) const {
+	if (!std::isfinite(ratio) || std::abs(ratio) <= real_t{1e-8})
+		return false;
+
+	for (const auto *ax : axles) {
+		if (ax == nullptr || ax->drive_ratio <= real_t{0.0})
+			continue;
+		for (const auto *wh : ax->get_wheels()) {
+			if (wh != nullptr && wh->is_on_ground())
+				return true;
+		}
+	}
+	return false;
+}
+
+void Vehicle::_reset_reflected_load_cache() {
+	reflected_load_cache = real_t{0.0};
+	reflected_load_ratio = real_t{0.0};
+	reflected_load_valid = false;
+}
+
+void Vehicle::_begin_reflected_load_frame() {
+	const real_t ratio = clutch_gearbox.get_effective_ratio();
+	if (!_has_reflected_load_topology(ratio)) {
+		_reset_reflected_load_cache();
+		return;
+	}
+
+	// A gear/ratio change invalidates the old estimate; it was expressed in a
+	// different engine-side coordinate and must not leak into this frame.
+	if (reflected_load_valid &&
+			std::abs(reflected_load_ratio - ratio) > real_t{1e-8})
+		_reset_reflected_load_cache();
+	reflected_load_ratio = ratio;
+}
+
+void Vehicle::_refresh_reflected_load_cache() {
+	const real_t ratio = clutch_gearbox.get_effective_ratio();
+	if (!_has_reflected_load_topology(ratio)) {
+		_reset_reflected_load_cache();
+		return;
+	}
+
+	const real_t load = _compute_reflected_load();
+	if (!std::isfinite(load)) {
+		_reset_reflected_load_cache();
+		return;
+	}
+	reflected_load_cache = load;
+	reflected_load_ratio = ratio;
+	reflected_load_valid = true;
+}
+
 real_t Vehicle::_compute_reflected_load() const {
 	const real_t ratio = clutch_gearbox.get_effective_ratio();
-	if (ratio == 0.0)	return 0.0;
+	if (!_has_reflected_load_topology(ratio))
+		return real_t{0.0};
 
 	real_t load = 0.0;
 	for (auto &ax : axles) {
-		if (ax->drive_ratio > 0.0)
-			for (auto* wh : ax->get_wheels())
+		if (ax == nullptr || ax->drive_ratio <= real_t{0.0})
+			continue;
+		for (auto *wh : ax->get_wheels()) {
+			if (wh != nullptr && wh->is_on_ground())
 				load += (-wh->reaction_torque) / ratio * ax->drive_ratio;
+		}
 	}
 	return load;
 }

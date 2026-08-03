@@ -20,6 +20,9 @@
 #include "TireSkid.h"
 #include "Resources/turbo_data.h"
 
+#ifdef VEHICLE_SYSTEM_REGRESSION_TESTS
+#include "../Test/drivetrain_regression.h"
+#endif
 
 
 using namespace godot;
@@ -41,6 +44,9 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(Vehicle);
 	GDREGISTER_CLASS(VehicleTelemetry);
 	GDREGISTER_CLASS(TireSkid);
+	#ifdef VEHICLE_SYSTEM_REGRESSION_TESTS
+	GDREGISTER_CLASS(DrivetrainRegression);
+	#endif
 	
 	
 

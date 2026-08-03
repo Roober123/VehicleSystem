@@ -1,5 +1,6 @@
 #pragma once
 #include "RotationalBody.h"
+#include <cmath>
 #include <vector>
 
 namespace godot {
@@ -7,6 +8,9 @@ namespace godot {
 class ClutchGearConstraint {
 	RotationalBody* engine = nullptr;
 	RotationalBody* output = nullptr;
+	bool aggregate_output_state_valid = false;
+	real_t aggregate_output_inertia = 0.0;
+	real_t aggregate_output_angular_velocity = 0.0;
 
  public:
 	real_t clutch_engagement = 0.0;   // 0 = disengaged, 1 = fully locked
@@ -18,7 +22,14 @@ class ClutchGearConstraint {
 	real_t final_drive = 3.73;
 
 	void set_engine(RotationalBody* e)  { engine = e; }
-	void set_output(RotationalBody* o)  { output = o; }
+	void set_output(RotationalBody* o)  { output = o; aggregate_output_state_valid = false; }
+	void set_aggregate_output_state(real_t inertia, real_t angular_velocity) {
+		aggregate_output_state_valid = std::isfinite(inertia) && inertia > real_t{0.0} &&
+				std::isfinite(angular_velocity);
+		aggregate_output_inertia = inertia;
+		aggregate_output_angular_velocity = angular_velocity;
+	}
+	void clear_aggregate_output_state() { aggregate_output_state_valid = false; }
 	RotationalBody* get_engine() const  { return engine; }
 	RotationalBody* get_output() const  { return output; }
 

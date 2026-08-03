@@ -84,8 +84,5 @@
 		<member name="tire_data" type="TireData" setter="set_tire_data" getter="get_tire_data">
 			[TireData] resource configuring tire parameters for all wheels on this axle. Overrides the vehicle-level tire data if set.
 		</member>
-		<member name="differential_type" type="String" setter="set_differential_type" getter="get_differential_type" default="&quot;Open&quot;">
-			Type of differential: [code]Open[/code], [code]LSD[/code] (Limited-Slip Differential), or [code]Torsen[/code]. Affects torque distribution between left and right wheels.
-		</member>
 	</members>
 </class>

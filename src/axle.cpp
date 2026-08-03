@@ -29,11 +29,6 @@ void Axle::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "downforce_ratio", PROPERTY_HINT_RANGE, "0.0,1.0,0.05"),
                           "set_downforce_ratio", "get_downforce_ratio");
 
-    ClassDB::bind_method(D_METHOD("set_differential_type", "type"), &Axle::set_differential_type);
-    ClassDB::bind_method(D_METHOD("get_differential_type"), &Axle::get_differential_type);
-    ADD_PROPERTY(PropertyInfo(Variant::STRING, "differential_type", PROPERTY_HINT_ENUM, "Open,LSD,Torsen"),
-                          "set_differential_type", "get_differential_type");
-
     ClassDB::bind_method(D_METHOD("get_steer_angle"), &Axle::get_steer_angle);
 
 }
@@ -57,7 +52,8 @@ void Axle::_ready() {
         for (auto* wh : wheels)
             wh->set_tire(tire_data);
     }
-    _instantiate_differential();
+    // Open is the sole supported differential in this package.
+    differential = std::make_unique<Open_Differential>();
 }
 
 const std::vector<Wheel*>& Axle::get_wheels() const {
@@ -173,27 +169,6 @@ void Axle::solve_steering(real_t steer_input, real_t dt, real_t speed_kph) {
 
 real_t Axle::get_steer_angle() const {
     return steering_rack.get_angle();
-}
-
-void Axle::set_differential_type(const String &p_type) {
-    differential_type = p_type;
-    if (!Engine::get_singleton()->is_editor_hint()) {
-        _instantiate_differential();
-    }
-}
-
-String Axle::get_differential_type() const {
-    return differential_type;
-}
-
-void Axle::_instantiate_differential() {
-    if (differential_type == "LSD") {
-        differential = std::make_unique<LSD_Differential>();
-    } else if (differential_type == "Torsen") {
-        differential = std::make_unique<Torsen_Differential>();
-    } else {
-        differential = std::make_unique<Open_Differential>();
-    }
 }
 
 void Axle::set_downforce_ratio(real_t value) {

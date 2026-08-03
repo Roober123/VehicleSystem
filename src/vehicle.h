@@ -25,6 +25,8 @@
 
 namespace godot {
 
+struct DrivetrainRegressionAccess;
+
 class Vehicle : public RigidBody3D {
     GDCLASS(Vehicle, RigidBody3D);
 
@@ -50,9 +52,18 @@ protected:
 	void _run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Vector3 &com_global, const Vector3 &linear_velocity, 
 		const Vector3 &angular_velocity, real_t sub_dt, real_t wheel_brake, real_t speed_kph, bool abs_enabled);
 	real_t _compute_reflected_load() const;
+	bool _has_reflected_load_topology(real_t ratio) const;
+	void _reset_reflected_load_cache();
+	void _begin_reflected_load_frame();
+	void _refresh_reflected_load_cache();
 	void _compute_axle_dimensions();
 
 	real_t smoothed_steer = 0.0;
+	real_t reflected_load_cache = 0.0;
+	real_t reflected_load_ratio = 0.0;
+	bool reflected_load_valid = false;
+
+	friend struct DrivetrainRegressionAccess;
 
 public:
     Vehicle();

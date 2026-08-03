@@ -61,10 +61,6 @@ public:
     void set_steering_rack_data(const Ref<SteeringRackData> &p_data) { steering_rack_data = p_data; }
     Ref<SteeringRackData> get_steering_rack_data() const { return steering_rack_data; }
 
-    // Differential type: "Open", "LSD", "Torsen"
-    void set_differential_type(const String &p_type);
-    String get_differential_type() const;
-
     void compute_suspension_parameters(real_t mass, const Ref<SuspensionData>& s);
 
     void update_physics(PhysicsDirectBodyState3D *vehicle_state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity);
@@ -93,13 +89,9 @@ public:
     real_t get_wheelbase() const { return wheelbase; }
 
 private:
-    String differential_type = "Open";
-
     real_t filtered_sat = 0.0;
     real_t trackwidth = 0.0;
     real_t wheelbase = 0.0;
-
-    void _instantiate_differential();
 };
 
 }

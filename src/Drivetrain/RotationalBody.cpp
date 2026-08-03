@@ -3,10 +3,13 @@
 namespace godot {
 
 void RotationalBody::integrate(real_t dt) {
-	real_t drag_torque = -drag * angular_velocity;
-	angular_velocity += (torque + drag_torque) / inertia * dt;
+	angular_velocity += get_effective_torque() / inertia * dt;
 	angle += angular_velocity * dt;
 	torque = 0.0;
+}
+
+real_t RotationalBody::predict_angular_velocity(real_t dt) const {
+	return angular_velocity + get_effective_torque() / inertia * dt;
 }
 
 void RotationalBody::add_torque(real_t value) {
