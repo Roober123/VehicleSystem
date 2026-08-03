@@ -22,12 +22,10 @@ class SteeringRack {
     real_t derivative_gain = 0.0;
 
     real_t sat_gain = 0.0;
-    bool configured = false;
     public:
     void load(const Ref<SteeringRackData>& s);
     void solve(real_t steer_input, real_t sat_torque, real_t dt, real_t speed_kph = 0.0);
     real_t get_angle() const;
-    bool is_configured() const { return configured; }
 };
 
 }

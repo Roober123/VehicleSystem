@@ -1,138 +1,87 @@
-# VehicleSystem — Godot 4 GDExtension
+# VehicleSystem - Godot 4 GDExtension
 
-A fully simulated vehicle physics system for Godot 4, built as a native GDExtension in C++. Features a complete drivetrain with engine, clutch, gearbox, open differential, suspension, tires, aerodynamics, turbo, traction control, and ABS.
-
-Built on the [godot-cpp](https://github.com/godotengine/godot-cpp) template.
+VehicleSystem is a native C++17 vehicle simulation for Godot 4. `Vehicle` is
+the composition root for a validated, one-shot setup. `VehicleRunningGear`
+owns axles, wheels, suspension, steering, tires, traction control, and
+aerodynamics. `VehicleDrivetrain` owns the engine, gearbox, clutch, driveshaft,
+grouped driven-axle carrier coupling, and optional turbo. No exhaust subsystem
+is part of the runtime composition.
 
 ## Features
-- **Substepping** - user can use substepping for better stability without bumping up the engine physics ticks. For best quality it is recommended to use 120hz in engine physics and 2 substeps.
-- **Engine** — Torque curve, rev-limiter, idle controller, internal friction, engine braking
-- **Turbo** — Spool-up/down dynamics, boost pressure curve, configurable via `TurboData`
-- **Clutch & Gearbox** — Automatic and semi-automatic modes, configurable ratios, shift timing, clutch engagement simulation
-- **Drivetrain** — Driveshaft, per-axle open differential (the only differential implementation currently available), shaft-to-wheel coupling constraint
-- **Suspension** — Per-wheel spring-damper, anti-roll bars, configurable via `SuspensionData`
-- **Tires** — Custom friction curves, relaxation, self-aligning torque, ABS
-- **Steering Rack** — P-D controller with inertia and friction, speed-sensitive, self-aligning torque feedback
-- **Aerodynamics** — Drag, downforce (per-axle distribution), yaw damping
-- **Traction Control** — Slip-based torque reduction
-- **Skid Marks** — Procedural mesh ribbons via `TireSkid` (auto-cleanup, no runtime allocations)
-- **Exhaust FX** — Smoke, heat, and flame probability for visual effects
-- **Telemetry** — `VehicleTelemetry` node for UI/HUD: RPM, speed, gear, clutch, torque, boost, wheel speeds
 
-## Getting Started
+- Configurable engine torque curve, idle/redline behavior, braking, and turbo.
+- Command-based gearbox shifting with automatic and semi-automatic modes.
+- Grouped shaft-to-axle-carrier coupling; equal wheel impulses preserve
+  left/right differential speed.
+- Per-wheel suspension, tire forces, ABS, steering, aerodynamics, and traction
+  control.
+- `VehicleTelemetry` snapshot consumer with cached wheel topology and bounded
+  per-wheel arrays.
+- `TireSkid` procedural ribbons backed by a fixed-size recycling pool. No fade
+  or lifetime visual effect is promised.
 
-### Prerequisites
+## Getting started
 
-- Godot 4.7+
-- SCons (`pip install scons`)
-- C++17 compiler (MSVC, GCC/MinGW, or Clang)
-
-### Build
-
-```shell
-scons -j4
-```
-
-The compiled library will be placed in `project/bin/`. Open the `project/` folder in Godot to test.
-
-### Cached debug normal/test variants
-
-Run these commands from `godot-cpp-template/` (the template root):
+Prerequisites are Godot 4.7+, SCons, and a C++17 compiler. From this template
+root, build the supported debug variants with:
 
 ```shell
 scons -j11 target=template_debug
 scons -j11 tests=1 target=template_debug
 ```
 
-`tests` is a SCons `BoolVariable` (and appears in `scons --help`). It is
-supported only with `target=template_debug`. The first command selects the
-normal debug DLL; the second selects the test-enabled DLL. Both variants are
-linked persistently under `bin/windows/` as
-`VehicleSystem.windows.template_debug.x86_64.normal.dll` and
-`VehicleSystem.windows.template_debug.x86_64.tests.dll`. The selected variant
-is copied by `InstallAs` to the canonical
-`project/bin/windows/VehicleSystem.windows.template_debug.x86_64.dll` path
-referenced by `project/bin/VehicleSystem.gdextension`.
+The selected extension is installed at
+`project/bin/windows/VehicleSystem.windows.template_debug.x86_64.dll`.
 
-The root build keeps the environment returned by `godot-cpp/SConstruct`
-immutable. `godot-cpp` is already a static debug archive at
-`godot-cpp/bin/libgodot-cpp.windows.template_debug.x86_64.a` and remains a
-normal dependency. VehicleSystem production object
-nodes are shared by both variants; only test registration and regression
-objects use the test define and the test-only `.tests.os` suffix. After both
-variants have been built once, warm normal/test switching performs zero
-compile, archive, or link actions and one canonical install/copy.
-
-An optional `SCONS_CACHE`/`CacheDir` can supplement clean rebuilds, but is not
-required for variant reuse and does not replace normal dependency tracking.
-The workspace path contains a historical `OneDrive` name; synchronization is
-disabled for this project. This cache work is deliberately limited to
-`template_debug`; no `template_release` command or artifact was touched, and
-no release-specific behavior or branch was changed.
-
-To select the normal or test DLL, rerun the corresponding command above. If a
-variant or the godot-cpp archive is missing or stale, SCons rebuilds it through
-the normal dependency graph. If generated output is malformed, verify the
-exact debug target, move only that target aside recoverably, and rerun the
-matching command; do not delete the shared godot-cpp archive blindly.
-
-### Drivetrain regression checks
-
-The deterministic drivetrain regression runner is opt-in and is excluded from normal extension builds. From the template root, build the test-enabled debug extension and run its scene headlessly:
+Run the deterministic regression and production trace headlessly with:
 
 ```shell
-scons -j11 tests=1 target=template_debug
 godot --headless --path project Test/drivetrain_regression.tscn
-```
-
-### Platform-specific
-
-| Platform | Build target |
-|----------|-------------|
-| Windows  | `scons platform=windows` |
-| Linux    | `scons platform=linux` |
-| macOS    | `scons platform=macos` |
-
-## Project Structure
-
-```
-├── src/                    # Extension source code
-│   ├── vehicle.h/cpp       # Main Vehicle node (RigidBody3D)
-│   ├── axle.h/cpp           # Axle node (groups wheels)
-│   ├── wheel.h/cpp          # Wheel node (suspension + tire forces)
-│   ├── SteeringRack.h/cpp   # Steering rack dynamics
-│   ├── TireSkid.h/cpp       # Skid mark system
-│   ├── VehicleAerodynamics.h/cpp
-│   ├── ExhaustSystem.h/cpp
-│   ├── TractionControl.h/cpp
-│   ├── VehicleTelemetry.h/cpp
-│   ├── Drivetrain/          # Engine, clutch, gearbox, differential, turbo
-│   ├── Resources/           # Godot Resource classes (SuspensionData, TireData, etc.)
-│   └── register_types.cpp   # GDExtension entry point
-├── project/                # Godot test project
-├── doc_classes/            # XML documentation for the Godot doc system
-└── godot-cpp/              # godot-cpp submodule
+godot --headless --path project Test/production_grounded_trace.tscn
 ```
 
 ## Configuration
 
-All vehicle parameters are configured via Godot **Resource** files:
+Assign one `VehicleConfig` resource to each `Vehicle`. Setup requires engine,
+gearbox, and suspension resources; at least one child `Axle`; exactly two
+distinct wheels and tire data per axle; steering data on steerable axles; and
+at least one positive axle `drive_share` with `DifferentialData`. At most two
+driven axles are supported; two driven axles additionally require
+`center_differential_data`. Aerodynamics and turbo resources are optional.
+Validation reports all missing major resources/topology errors and leaves an
+invalid vehicle inert. Configuration cannot be replaced after initialization.
 
-| Resource | Description |
-|----------|-------------|
-| `SuspensionData` | Spring rate, damping, anti-roll bar |
-| `TireData` | Friction, radius, brake power, slip angle, relaxation |
-| `VehicleEngineData` | Torque curve, RPM limits, inertia, drag |
-| `GearboxData` | Gear ratios, final drive, clutch, shift time, auto/manual |
-| `TurboData` | Spool rates, boost pressure, RPM range |
-| `VehicleAerodynamicsData` | Drag, downforce, yaw damping |
-| `SteeringRackData` | Gains, inertia, friction, max angle |
+`DifferentialData` defaults to Open mode. Limited-slip defaults are 25 Nm
+preload, 0.35 power-lock ratio, 0.15 coast-lock ratio, 2 Nm per rad/s
+slip-sensitive gain, and a 250 Nm maximum lock torque. In Limited Slip mode,
+capacity is `min(max_lock_torque, preload_torque + active_lock_ratio *
+abs(transmitted_torque) + slip_sensitive_gain * abs(relative_speed))`; power
+uses the power ratio when transmitted torque times carrier speed is non-negative
+and coast uses the coast ratio otherwise. These lock fields are inactive in
+Open and Locked modes.
 
+## Project structure
 
-## Documentation
-
-Generate GDExtension docs with:
-
-```shell
-scons doc
+```text
+src/                         GDExtension production code
+  vehicle.{h,cpp}             composition root and frame ordering
+  VehicleRunningGear.*        cached running-gear phases
+  VehicleDrivetrain.*         drivetrain composition and commands
+  Drivetrain/                 engine, gearbox, clutch, differential, coupling
+  Resources/                  VehicleConfig, DifferentialData, and other resources
+  axle.*, wheel.*              axle and wheel physics
+Test/                         opt-in native regression
+project/Test/                 Godot regression and production trace scenes
+doc_classes/                  Godot class documentation inputs
+godot-cpp/                    godot-cpp binding submodule
 ```
+
+The coupling supports one or two weighted driven-axle carriers. It routes
+pending shaft torque by normalized `drive_share`, then solves the primary
+shaft/carrier coordinate, an optional two-axle center differential coordinate,
+and each axle's left/right differential coordinate in that order. Axle setup
+requires equal left/right wheel inertias; the effective axle carrier inertia
+is `4 / (1/I_left + 1/I_right)`. Topology and solver snapshots are cached at
+setup, and the solve path performs no hot-path allocation. `VehicleEngine`
+samples effective drive torque once per substep and reuses it for application
+and telemetry.

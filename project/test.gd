@@ -8,8 +8,12 @@ func _ready() -> void:
 	_telemetry = $Vehicle/VehicleTelemetry
 	$NavigationLayer/NavigationPanel/BackToMenuButton.pressed.connect(_return_to_menu)
 
+const THROTTLE_RISE_RATE := 3.0
 
-func _process(_delta: float) -> void:
+var forward_throttle := 0.0
+var reverse_throttle := 0.0
+
+func _process(dt: float) -> void:
 	if _telemetry == null:
 		return
 
@@ -48,20 +52,29 @@ func _process(_delta: float) -> void:
 		var label = ctrl.get_node_or_null("Wheel%dForceLabel" % (i + 1))
 		if label:
 			label.text = "Wheel %d Force: (%.0f, %.0f, %.0f)" % [i + 1, forces[i].x, forces[i].y, forces[i].z]
-	var th_input : float = Input.is_action_pressed("ui_up")
-	for i in get_children():
-		if i is Vehicle:
-			i.set_throttle_input(th_input)
-	$Vehicle.set_brake_input(Input.is_action_pressed("ui_down"))
+
+	var forward_pressed := float(Input.is_action_pressed("ui_up"))
+	var reverse_pressed := float(Input.is_action_pressed("ui_down"))
+	var current_gear: int = _telemetry.get_current_gear()
+	if current_gear < 0:
+		forward_throttle = 0.0
+		reverse_throttle = move_toward(
+			reverse_throttle, reverse_pressed, THROTTLE_RISE_RATE * dt)
+		$Vehicle.set_throttle_input(0.0)
+		$Vehicle.set_brake_input(reverse_throttle)
+	else:
+		reverse_throttle = 0.0
+		forward_throttle = move_toward(
+			forward_throttle, forward_pressed, THROTTLE_RISE_RATE * dt)
+		$Vehicle.set_throttle_input(forward_throttle)
+		$Vehicle.set_brake_input(reverse_pressed)
 	var steer : float = -Input.get_axis("ui_left", "ui_right")
 	$Vehicle.set_steer_input(steer)
 	
-	var shift_input : int = 0
 	if Input.is_action_just_pressed("shift_up"):
-		shift_input = 1
-	if Input.is_action_just_pressed("shift_down"):
-		shift_input = -1
-	$Vehicle.set_shift_input(shift_input)
+		$Vehicle.shift_up()
+	elif Input.is_action_just_pressed("shift_down"):
+		$Vehicle.shift_down()
 
 
 func _unhandled_input(event: InputEvent) -> void:

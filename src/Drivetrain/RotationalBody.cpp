@@ -4,7 +4,6 @@ namespace godot {
 
 void RotationalBody::integrate(real_t dt) {
 	angular_velocity += get_effective_torque() / inertia * dt;
-	angle += angular_velocity * dt;
 	torque = 0.0;
 }
 

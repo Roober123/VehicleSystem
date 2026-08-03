@@ -5,7 +5,6 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
-#include "example_class.h"
 #include "vehicle.h"
 #include "axle.h"
 #include "Resources/suspension_data.h"
@@ -14,11 +13,13 @@
 #include "Resources/vehicle_aerodynamics_data.h"
 #include "Resources/tire_data.h"
 #include "Resources/steering_rack_data.h"
+#include "Resources/differential_data.h"
 
 #include "wheel.h"
 #include "VehicleTelemetry.h"
 #include "TireSkid.h"
 #include "Resources/turbo_data.h"
+#include "Resources/vehicle_config.h"
 
 #ifdef VEHICLE_SYSTEM_REGRESSION_TESTS
 #include "../Test/drivetrain_regression.h"
@@ -33,6 +34,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		return;
 	}
 	GDREGISTER_CLASS(TurboData);
+	GDREGISTER_CLASS(DifferentialData);
+	GDREGISTER_CLASS(VehicleConfig);
 	GDREGISTER_CLASS(VehicleAerodynamicsData);
 	GDREGISTER_CLASS(SuspensionData);
 	GDREGISTER_CLASS(VehicleEngineData);

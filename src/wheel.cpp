@@ -1,24 +1,17 @@
 #include "wheel.h"
+#include "godot_cpp/variant/utility_functions.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace godot {
 
 void Wheel::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("get_suspension_rebound_force"), &Wheel::get_suspension_rebound_force);
     ClassDB::bind_method(D_METHOD("get_angular_velocity"), &Wheel::get_angular_velocity);
     ClassDB::bind_method(D_METHOD("get_tire_force"), &Wheel::get_tire_force);
-    ClassDB::bind_method(D_METHOD("get_reaction_torque"), &Wheel::get_reaction_torque);
     ClassDB::bind_method(D_METHOD("get_collision_point"), &Wheel::get_collision_point);
     ClassDB::bind_method(D_METHOD("get_collision_normal"), &Wheel::get_collision_normal);
     ClassDB::bind_method(D_METHOD("is_on_ground"), &Wheel::is_on_ground);
-    ClassDB::bind_method(D_METHOD("get_sustained_mass"), &Wheel::get_sustained_mass);
-    ClassDB::bind_method(D_METHOD("get_compression"), &Wheel::get_compression);
-    ClassDB::bind_method(D_METHOD("get_self_aligning_torque"), &Wheel::get_self_aligning_torque);
     ClassDB::bind_method(D_METHOD("get_slip_ratio"), &Wheel::get_slip_ratio);
-    ClassDB::bind_method(D_METHOD("get_slip_angle"), &Wheel::get_slip_angle);
-    ClassDB::bind_method(D_METHOD("get_abs_active"), &Wheel::get_abs_active);
-    ClassDB::bind_method(D_METHOD("get_is_sliding"), &Wheel::get_is_sliding);
 }
 
 void Wheel::set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load) {
@@ -27,6 +20,8 @@ void Wheel::set_suspension(real_t suspension_length, real_t stiffness, real_t da
     this->damping = damping;
     this->reference_load = std::max(reference_load, real_t{1.0});
     add_physics();
+    if (skid != nullptr)
+        skid->set_ribbon_width(tire_width);
 
 } 
 void Wheel::set_tire(const Ref<TireData>& t) {
@@ -37,6 +32,7 @@ void Wheel::set_tire(const Ref<TireData>& t) {
     this->forward_friction_curve = t->get_forward_friction_curve();
     this->lateral_friction_curve = t->get_lateral_friction_curve();
     this->radius = t->radius;
+    this->tire_width = t->tire_width;
     this->brake_power = t->brake_power;
     this->peak_slip_angle = t->peak_slip_angle;
     this->relaxation_low = t->relaxation_low;
@@ -68,7 +64,9 @@ void Wheel::add_physics() {
     }
 }
 
-void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity) {
+void Wheel::update_suspension(const Vector3 &com_global,
+                              const Vector3 &linear_velocity,
+                              const Vector3 &angular_velocity) {
     ray->force_raycast_update();
     if (!ray->is_colliding()) {
         on_ground = false;
@@ -105,17 +103,16 @@ void Wheel::update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vec
 
     forward_vector = get_global_transform().basis.get_column(2); // Z forward
     right_vector = get_global_transform().basis.get_column(0); // X right
-    up_vector = get_global_transform().basis.get_column(1); // Y up
-
 }
 
 void Wheel::set_normal_force(real_t force) {
     suspension_rebound_force = std::max(force, real_t{0.0});
-    sustained_mass = suspension_rebound_force / real_t{9.81};
 }
 
 
-void Wheel::solve_tire(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity, real_t dt, real_t brake_input, bool abs_enabled) {
+void Wheel::solve_tire(const Vector3 &com_global, const Vector3 &linear_velocity,
+                       const Vector3 &angular_velocity, real_t dt, real_t brake_input,
+                       bool abs_enabled) {
     is_sliding = false;
     reaction_torque = 0.0f;
     self_aligning_torque = 0.0;
@@ -180,7 +177,7 @@ void Wheel::_detect_tire_instability(real_t total_lateral_force, real_t dt) {
                     " | lateral oscillation #", oscillation_count,
                     " | prev=", prev_lateral_force,
                     " | curr=", total_lateral_force,
-                    " | sustained_mass=", sustained_mass,
+                    " | sustained_mass=", suspension_rebound_force / real_t{9.81},
                     " | compression=", compression);
                 instability_cooldown = cooldown_time;
             }

@@ -10,7 +10,7 @@ real_t TractionControl::apply(real_t driver_throttle, real_t speed,
 
     real_t max_slip = real_t{0.0};
     for (const auto* ax : axles) {
-        if (ax->drive_ratio <= real_t{0.0}) continue;
+        if (ax->get_drive_share() <= real_t{0.0}) continue;
         for (const auto* wh : ax->get_wheels())
             max_slip = std::max(max_slip, std::abs(wh->get_slip_ratio()));
     }

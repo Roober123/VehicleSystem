@@ -1,212 +1,112 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="Vehicle" inherits="RigidBody3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A fully simulated vehicle with suspension, steering, engine, gearbox, clutch, driveshaft, and aerodynamics.
+		Godot composition root for a configured, simulated vehicle.
 	</brief_description>
 	<description>
-		Vehicle is a [RigidBody3D] that simulates a multi-axle vehicle with a complete drivetrain. It uses [Axle] children to group wheels and distributes torque based on each axle's drive ratio. The engine, clutch, gearbox, driveshaft, and aerodynamics are simulated internally.
+		Vehicle owns setup and physics-frame ordering while delegating running gear and drivetrain phases to value-owned components. Configure one [VehicleConfig] resource and exactly-two-wheel [Axle] children before runtime. Setup validation is fail-closed and one-shot; replacing the config after initialization is rejected.
 
-		Configure via resource properties: [SuspensionData], [VehicleEngineData], [GearboxData], [TireData], [VehicleAerodynamicsData].
-
-		Input is provided each physics frame through [member throttle_input], [member steer_input], [member brake_input], and [member shift_input].
+		The drivetrain exposes command methods for shifting. Telemetry is assembled as an immutable C++ [code]VehicleTelemetrySnapshot[/code] value rather than a live component reference.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="set_suspension_data" qualifiers="">
+		<method name="set_config" qualifiers="">
 			<return type="void" />
-			<param index="0" name="data" type="SuspensionData" />
-			<description>
-				Sets the [SuspensionData] resource for configuring suspension (spring rate, damping, anti-roll bar).
-			</description>
+			<param index="0" name="config" type="VehicleConfig" />
+			<description>Sets the setup resource. It can only be changed before one-shot initialization.</description>
 		</method>
-		<method name="get_suspension_data" qualifiers="">
-			<return type="SuspensionData" />
-			<description>
-				Returns the [SuspensionData] resource.
-			</description>
-		</method>
-		<method name="set_engine_data" qualifiers="">
-			<return type="void" />
-			<param index="0" name="data" type="VehicleEngineData" />
-			<description>
-				Sets the [VehicleEngineData] resource for configuring the engine (torque curve, idle/redline RPM, inertia, drag).
-			</description>
-		</method>
-		<method name="get_engine_data" qualifiers="">
-			<return type="VehicleEngineData" />
-			<description>
-				Returns the [VehicleEngineData] resource.
-			</description>
-		</method>
-		<method name="set_gearbox_data" qualifiers="">
-			<return type="void" />
-			<param index="0" name="data" type="GearboxData" />
-			<description>
-				Sets the [GearboxData] resource for configuring gear ratios, final drive, clutch torque, and shift times.
-			</description>
-		</method>
-		<method name="get_gearbox_data" qualifiers="">
-			<return type="GearboxData" />
-			<description>
-				Returns the [GearboxData] resource.
-			</description>
-		</method>
-		<method name="set_tire_data" qualifiers="">
-			<return type="void" />
-			<param index="0" name="data" type="TireData" />
-			<description>
-				Sets the [TireData] resource for configuring tire grip, radius, brake power, peak slip angle, and relaxation.
-			</description>
-		</method>
-		<method name="get_tire_data" qualifiers="">
-			<return type="TireData" />
-			<description>
-				Returns the [TireData] resource.
-			</description>
-		</method>
-		<method name="set_aero_data" qualifiers="">
-			<return type="void" />
-			<param index="0" name="data" type="VehicleAerodynamicsData" />
-			<description>
-				Sets the [VehicleAerodynamicsData] resource for configuring drag, downforce, and yaw damping.
-			</description>
-		</method>
-		<method name="get_aero_data" qualifiers="">
-			<return type="VehicleAerodynamicsData" />
-			<description>
-				Returns the [VehicleAerodynamicsData] resource.
-			</description>
+		<method name="get_config" qualifiers="const">
+			<return type="VehicleConfig" />
+			<description>Returns the configured setup resource.</description>
 		</method>
 		<method name="set_throttle_input" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
-			<description>
-				Sets the throttle input (0.0 to 1.0). Values outside this range are clamped.
-			</description>
+			<description>Sets throttle input; the value is clamped to [0, 1].</description>
 		</method>
 		<method name="get_throttle_input" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the current throttle input value (0.0 to 1.0).
-			</description>
+			<description>Returns the clamped throttle input.</description>
 		</method>
 		<method name="set_steer_input" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
-			<description>
-				Sets the steering input (-1.0 to 1.0, negative = left, positive = right). The steering rack smooths and rate-limits this value internally.
-			</description>
+			<description>Sets steering input; the value is clamped to [-1, 1].</description>
 		</method>
 		<method name="get_steer_input" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the raw steering input value (-1.0 to 1.0).
-			</description>
+			<description>Returns the clamped steering input.</description>
 		</method>
 		<method name="set_brake_input" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
-			<description>
-				Sets the brake input (0.0 to 1.0). Values outside this range are clamped.
-			</description>
+			<description>Sets brake input; the value is clamped to [0, 1].</description>
 		</method>
 		<method name="get_brake_input" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the current brake input value (0.0 to 1.0).
-			</description>
+			<description>Returns the clamped brake input.</description>
 		</method>
-		<method name="set_shift_input" qualifiers="">
+		<method name="shift_up" qualifiers="">
 			<return type="void" />
-			<param index="0" name="value" type="int" />
-			<description>
-				Sets the shift input (-1 = shift down, 0 = none, 1 = shift up). For semi-automatic mode only; ignored in automatic mode.
-			</description>
+			<description>Queues a command to shift up through the gearbox.</description>
 		</method>
-		<method name="get_shift_input" qualifiers="const">
-			<return type="int" />
-			<description>
-				Returns the current shift input (-1, 0, or 1).
-			</description>
+		<method name="shift_down" qualifiers="">
+			<return type="void" />
+			<description>Queues a command to shift down through the gearbox.</description>
+		</method>
+		<method name="select_drive" qualifiers="">
+			<return type="void" />
+			<description>Queues a command to select forward drive.</description>
+		</method>
+		<method name="select_neutral" qualifiers="">
+			<return type="void" />
+			<description>Queues a command to select neutral.</description>
+		</method>
+		<method name="select_reverse" qualifiers="">
+			<return type="void" />
+			<description>Queues a command to select reverse.</description>
+		</method>
+		<method name="set_abs_enabled" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>Enables or disables anti-lock brake modulation.</description>
+		</method>
+		<method name="get_abs_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether anti-lock brake modulation is enabled.</description>
+		</method>
+		<method name="set_tcs_enabled" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>Enables or disables traction-control throttle reduction.</description>
+		</method>
+		<method name="get_tcs_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether traction control is enabled.</description>
 		</method>
 		<method name="set_substeps" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="int" />
-			<description>
-				Sets the number of physics substeps per frame. Higher values improve drivetrain stability at the cost of performance. Range: 1 to 128.
-			</description>
+			<description>Sets physics substeps per frame; the value is clamped to [1, 1024].</description>
 		</method>
 		<method name="get_substeps" qualifiers="const">
 			<return type="int" />
-			<description>
-				Returns the number of physics substeps per frame.
-			</description>
-		</method>
-		<method name="get_speed_kph" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the vehicle's current speed in kilometers per hour.
-			</description>
-		</method>
-		<method name="get_exhaust_smoke" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the current exhaust smoke intensity (0.0 to 1.0) based on engine load and RPM.
-			</description>
-		</method>
-		<method name="get_exhaust_heat" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the current exhaust heat intensity (0.0 to 1.0) for visual effects.
-			</description>
-		</method>
-		<method name="get_exhaust_flame_probability" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the probability (0.0 to 1.0) of exhaust flames occurring this frame, based on engine conditions like high RPM and fuel cut.
-			</description>
+			<description>Returns physics substeps per frame.</description>
 		</method>
 	</methods>
 	<members>
-		<member name="suspension_data" type="SuspensionData" setter="set_suspension_data" getter="get_suspension_data">
-			Resource configuring the vehicle's suspension (spring rate, damping, anti-roll bar).
-		</member>
-		<member name="engine_data" type="VehicleEngineData" setter="set_engine_data" getter="get_engine_data">
-			Resource configuring the vehicle's engine (torque curve, RPM limits, inertia).
-		</member>
-		<member name="gearbox_data" type="GearboxData" setter="set_gearbox_data" getter="get_gearbox_data">
-			Resource configuring the gearbox and clutch (ratios, shift times, clutch torque).
-		</member>
-		<member name="tire_data" type="TireData" setter="set_tire_data" getter="get_tire_data">
-			Resource configuring tire parameters (grip, radius, peak slip angle, relaxation).
-		</member>
-		<member name="aero_data" type="VehicleAerodynamicsData" setter="set_aero_data" getter="get_aero_data">
-			Resource configuring aerodynamics (drag, downforce, yaw damping coefficient).
+		<member name="config" type="VehicleConfig" setter="set_config" getter="get_config">
+			Setup resource containing required engine, gearbox, suspension, and optional aerodynamics/turbo data.
 		</member>
 		<member name="abs_enabled" type="bool" setter="set_abs_enabled" getter="get_abs_enabled" default="true">
-			If [code]true[/code], the anti-lock braking system actively modulates brake pressure to prevent wheel lockup.
+			Whether anti-lock brake modulation is enabled.
 		</member>
 		<member name="tcs_enabled" type="bool" setter="set_tcs_enabled" getter="get_tcs_enabled" default="true">
-			If [code]true[/code], traction control reduces engine torque when wheel slip exceeds the threshold.
-		</member>
-		<member name="turbo_data" type="TurboData" setter="set_turbo_data" getter="get_turbo_data">
-			[TurboData] resource configuring turbocharger behavior (spool rates, max boost, RPM ranges).
-		</member>
-		<member name="throttle_input" type="float" setter="set_throttle_input" getter="get_throttle_input" default="0.0">
-			Throttle input (0.0 to 1.0).
-		</member>
-		<member name="steer_input" type="float" setter="set_steer_input" getter="get_steer_input" default="0.0">
-			Steering input (-1.0 to 1.0).
-		</member>
-		<member name="brake_input" type="float" setter="set_brake_input" getter="get_brake_input" default="0.0">
-			Brake input (0.0 to 1.0).
-		</member>
-		<member name="shift_input" type="int" setter="set_shift_input" getter="get_shift_input" default="0">
-			Shift input (-1 = shift down, 0 = none, 1 = shift up).
+			Whether traction-control throttle reduction is enabled.
 		</member>
 		<member name="substeps" type="int" setter="set_substeps" getter="get_substeps" default="1">
-			Number of physics substeps per frame (1 to 1024).
+			Physics substeps per frame, clamped to [1, 1024].
 		</member>
 	</members>
 </class>

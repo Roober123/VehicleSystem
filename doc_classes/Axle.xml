@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="Axle" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A vehicle axle that groups wheels and controls steering, drive torque, and anti-roll.
+		Axle grouping node for exactly two vehicle wheels and an optional differential.
 	</brief_description>
 	<description>
-		Axle is a [Node3D] that serves as a grouping node for [Wheel] children. It computes suspension parameters per wheel, controls steering via an internal steering rack model, distributes drive torque, and provides anti-roll bar force between paired wheels.
+		Axle groups its child [Wheel] nodes and owns steering, suspension/tire phase access, anti-roll force, and differential setup. Vehicle setup requires exactly two distinct wheels and [TireData] on every axle. Positive [member drive_share] values identify driven axles; up to two driven axles are supported and shares are normalized for shaft routing. Driven axles require [DifferentialData]. A steering-rack resource is required only when [member is_steerable] is true. Differential setup requires the two wheel rotational inertias to match within the solver tolerance.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -12,77 +12,78 @@
 		<method name="set_steerable" qualifiers="">
 			<return type="void" />
 			<param index="0" name="is_steerable" type="bool" />
-			<description>
-				If [code]true[/code], the wheels on this axle respond to the vehicle's steering input.
-			</description>
+			<description>Sets whether this axle responds to vehicle steering input.</description>
 		</method>
-		<method name="get_steerable" qualifiers="">
+		<method name="get_steerable" qualifiers="const">
 			<return type="bool" />
-			<description>
-				Returns whether this axle is steerable.
-			</description>
+			<description>Returns whether this axle is steerable.</description>
 		</method>
-		<method name="set_drive_ratio" qualifiers="">
+		<method name="set_drive_share" qualifiers="">
 			<return type="void" />
-			<param index="0" name="drive_ratio" type="float" />
-			<description>
-				Sets the fraction of engine torque sent to this axle (0.0 to 1.0). Values across all axles should sum to 1.0.
-			</description>
+			<param index="0" name="drive_share" type="float" />
+			<description>Sets the non-negative nominal drive share for this axle. Positive values mark the axle as driven.</description>
 		</method>
-		<method name="get_drive_ratio" qualifiers="">
+		<method name="get_drive_share" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the drive torque ratio for this axle.
-			</description>
+			<description>Returns this axle's nominal drive share.</description>
+		</method>
+		<method name="set_differential_data" qualifiers="">
+			<return type="void" /><param index="0" name="data" type="DifferentialData" />
+			<description>Sets the required axle differential resource for a driven axle.</description>
+		</method>
+		<method name="get_differential_data" qualifiers="const">
+			<return type="DifferentialData" /><description>Returns the axle differential resource.</description>
 		</method>
 		<method name="set_steering_rack_data" qualifiers="">
 			<return type="void" />
 			<param index="0" name="data" type="SteeringRackData" />
-			<description>
-				Sets the [SteeringRackData] resource for configuring the steering rack (gains, inertia, friction).
-			</description>
+			<description>Sets steering-rack parameters used when this axle is steerable.</description>
 		</method>
-		<method name="get_steering_rack_data" qualifiers="">
+		<method name="get_steering_rack_data" qualifiers="const">
 			<return type="SteeringRackData" />
-			<description>
-				Returns the [SteeringRackData] resource.
-			</description>
+			<description>Returns steering-rack parameters.</description>
+		</method>
+		<method name="set_tire_data" qualifiers="">
+			<return type="void" />
+			<param index="0" name="data" type="TireData" />
+			<description>Sets tire parameters applied to this axle's wheels during setup.</description>
+		</method>
+		<method name="get_tire_data" qualifiers="const">
+			<return type="TireData" />
+			<description>Returns this axle's tire parameters.</description>
 		</method>
 		<method name="set_downforce_ratio" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
-			<description>
-				Sets the fraction of total aerodynamic downforce applied to this axle (0.0 to 1.0).
-			</description>
+			<description>Sets the fraction of aerodynamic downforce assigned to this axle, clamped to [0, 1].</description>
 		</method>
-		<method name="get_downforce_ratio" qualifiers="">
+		<method name="get_downforce_ratio" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the downforce ratio for this axle.
-			</description>
+			<description>Returns this axle's aerodynamic downforce fraction.</description>
 		</method>
 		<method name="get_steer_angle" qualifiers="const">
 			<return type="float" />
-			<description>
-				Returns the current steering angle in radians applied to the wheels on this axle.
-			</description>
+			<description>Returns the current steering angle in radians.</description>
 		</method>
 	</methods>
 	<members>
 		<member name="is_steerable" type="bool" setter="set_steerable" getter="get_steerable" default="false">
-			If [code]true[/code], this axle responds to steering input.
+			Whether the axle responds to steering input.
 		</member>
-		<member name="drive_ratio" type="float" setter="set_drive_ratio" getter="get_drive_ratio" default="0.0">
-			Fraction of engine torque applied to this axle (0.0 to 1.0).
+		<member name="drive_share" type="float" setter="set_drive_share" getter="get_drive_share" default="0.0">
+			Non-negative nominal drive share; positive values mark a driven axle.
+		</member>
+		<member name="differential_data" type="DifferentialData" setter="set_differential_data" getter="get_differential_data">
+			Differential resource required for driven axles.
 		</member>
 		<member name="downforce_ratio" type="float" setter="set_downforce_ratio" getter="get_downforce_ratio" default="0.5">
-			Fraction of total aerodynamic downforce applied to this axle (0.0 to 1.0).
+			Fraction of aerodynamic downforce assigned to this axle.
 		</member>
 		<member name="steering_rack_data" type="SteeringRackData" setter="set_steering_rack_data" getter="get_steering_rack_data">
-			[SteeringRackData] resource configuring the steering rack dynamics (gains, inertia, friction, max angle).
+			Steering-rack resource required for steerable axles.
 		</member>
 		<member name="tire_data" type="TireData" setter="set_tire_data" getter="get_tire_data">
-			[TireData] resource configuring tire parameters for all wheels on this axle. Overrides the vehicle-level tire data if set.
+			Tire resource required by Vehicle setup for every axle.
 		</member>
 	</members>
 </class>

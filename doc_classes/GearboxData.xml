@@ -78,26 +78,26 @@
 			<return type="void" />
 			<param index="0" name="value" type="float" />
 			<description>
-				Sets the engine RPM threshold for automatic upshifting.
+				Sets the normalized engine-RPM ratio threshold for automatic upshifting. The value is interpreted within the engine idle-to-redline range.
 			</description>
 		</method>
 		<method name="get_upshift_rpm" qualifiers="">
 			<return type="float" />
 			<description>
-				Returns the automatic upshift RPM threshold.
+				Returns the normalized automatic upshift threshold.
 			</description>
 		</method>
 		<method name="set_downshift_rpm" qualifiers="">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
 			<description>
-				Sets the engine RPM threshold for automatic downshifting.
+				Sets the normalized engine-RPM ratio threshold for automatic downshifting. The value is interpreted within the engine idle-to-redline range.
 			</description>
 		</method>
 		<method name="get_downshift_rpm" qualifiers="">
 			<return type="float" />
 			<description>
-				Returns the automatic downshift RPM threshold.
+				Returns the normalized automatic downshift threshold.
 			</description>
 		</method>
 		<method name="set_auto_mode" qualifiers="">
@@ -131,10 +131,10 @@
 			Duration of a gear change in seconds.
 		</member>
 		<member name="upshift_rpm" type="float" setter="set_upshift_rpm" getter="get_upshift_rpm" default="3500.0">
-			Engine RPM threshold for automatic upshifting.
+			Normalized engine-RPM ratio threshold for automatic upshifting.
 		</member>
 		<member name="downshift_rpm" type="float" setter="set_downshift_rpm" getter="get_downshift_rpm" default="2000.0">
-			Engine RPM threshold for automatic downshifting.
+			Normalized engine-RPM ratio threshold for automatic downshifting.
 		</member>
 		<member name="auto_mode" type="bool" setter="set_auto_mode" getter="get_auto_mode" default="true">
 			If true, gearbox operates in fully automatic mode. If false, semi-automatic mode.

@@ -1,50 +1,36 @@
 #include "vehicle.h"
+
+#include "vehicle_setup_validation.h"
+
 #include <algorithm>
-#include <cmath>
+
+#include "godot_cpp/classes/engine.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
 
 namespace godot {
 
 void Vehicle::_bind_methods() {
     ADD_SIGNAL(MethodInfo("vehicle_ready"));
 
-    ClassDB::bind_method(D_METHOD("set_suspension_data", "data"), &Vehicle::set_suspension_data);
-    ClassDB::bind_method(D_METHOD("get_suspension_data"), &Vehicle::get_suspension_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "suspension_data", PROPERTY_HINT_RESOURCE_TYPE, "SuspensionData"),
-				 "set_suspension_data", "get_suspension_data");
-
-    ClassDB::bind_method(D_METHOD("set_engine_data", "data"), &Vehicle::set_engine_data);
-    ClassDB::bind_method(D_METHOD("get_engine_data"), &Vehicle::get_engine_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "engine_data", PROPERTY_HINT_RESOURCE_TYPE, "VehicleEngineData"),
-				 "set_engine_data", "get_engine_data");
-
-    ClassDB::bind_method(D_METHOD("set_gearbox_data", "data"), &Vehicle::set_gearbox_data);
-    ClassDB::bind_method(D_METHOD("get_gearbox_data"), &Vehicle::get_gearbox_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "gearbox_data", PROPERTY_HINT_RESOURCE_TYPE, "GearboxData"),
-				 "set_gearbox_data", "get_gearbox_data");
+    ClassDB::bind_method(D_METHOD("set_config", "config"), &Vehicle::set_config);
+    ClassDB::bind_method(D_METHOD("get_config"), &Vehicle::get_config);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "config", PROPERTY_HINT_RESOURCE_TYPE, "VehicleConfig"),
+                 "set_config", "get_config");
 
     ClassDB::bind_method(D_METHOD("set_throttle_input", "value"), &Vehicle::set_throttle_input);
     ClassDB::bind_method(D_METHOD("get_throttle_input"), &Vehicle::get_throttle_input);
-    
 
     ClassDB::bind_method(D_METHOD("set_steer_input", "value"), &Vehicle::set_steer_input);
     ClassDB::bind_method(D_METHOD("get_steer_input"), &Vehicle::get_steer_input);
-    
 
     ClassDB::bind_method(D_METHOD("set_brake_input", "value"), &Vehicle::set_brake_input);
     ClassDB::bind_method(D_METHOD("get_brake_input"), &Vehicle::get_brake_input);
-    
 
-    ClassDB::bind_method(D_METHOD("set_shift_input", "value"), &Vehicle::set_shift_input);
-    ClassDB::bind_method(D_METHOD("get_shift_input"), &Vehicle::get_shift_input);
-
-	
-    ClassDB::bind_method(D_METHOD("set_aero_data", "data"), &Vehicle::set_aero_data);
-    ClassDB::bind_method(D_METHOD("get_aero_data"), &Vehicle::get_aero_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "aero_data", PROPERTY_HINT_RESOURCE_TYPE, "VehicleAerodynamicsData"), "set_aero_data", "get_aero_data");
-
-    ClassDB::bind_method(D_METHOD("set_turbo_data", "data"), &Vehicle::set_turbo_data);
-    ClassDB::bind_method(D_METHOD("get_turbo_data"), &Vehicle::get_turbo_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "turbo_data", PROPERTY_HINT_RESOURCE_TYPE, "TurboData"), "set_turbo_data", "get_turbo_data");
+    ClassDB::bind_method(D_METHOD("shift_up"), &Vehicle::shift_up);
+    ClassDB::bind_method(D_METHOD("shift_down"), &Vehicle::shift_down);
+    ClassDB::bind_method(D_METHOD("select_drive"), &Vehicle::select_drive);
+    ClassDB::bind_method(D_METHOD("select_neutral"), &Vehicle::select_neutral);
+    ClassDB::bind_method(D_METHOD("select_reverse"), &Vehicle::select_reverse);
 
     ClassDB::bind_method(D_METHOD("set_abs_enabled", "value"), &Vehicle::set_abs_enabled);
     ClassDB::bind_method(D_METHOD("get_abs_enabled"), &Vehicle::get_abs_enabled);
@@ -54,343 +40,108 @@ void Vehicle::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_tcs_enabled"), &Vehicle::get_tcs_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tcs_enabled"), "set_tcs_enabled", "get_tcs_enabled");
 
-
     ClassDB::bind_method(D_METHOD("set_substeps", "value"), &Vehicle::set_substeps);
     ClassDB::bind_method(D_METHOD("get_substeps"), &Vehicle::get_substeps);
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "substeps", PROPERTY_HINT_RANGE, "1,1024,1"), "set_substeps", "get_substeps");
-
-
-    ClassDB::bind_method(D_METHOD("get_exhaust_smoke"), &Vehicle::get_exhaust_smoke);
-    ClassDB::bind_method(D_METHOD("get_exhaust_heat"), &Vehicle::get_exhaust_heat);
-    ClassDB::bind_method(D_METHOD("get_exhaust_flame_probability"), &Vehicle::get_exhaust_flame_probability);
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "substeps", PROPERTY_HINT_RANGE, "1,1024,1"),
+                 "set_substeps", "get_substeps");
 
 }
 
-Vehicle::Vehicle() {
-	axles = std::vector<Axle*>();
-	engine = VehicleEngine();
-
-	clutch_gearbox.set_engine(&engine);
-	clutch_gearbox.set_output(&drive_shaft);
-}
+Vehicle::Vehicle() = default;
 
 void Vehicle::_ready() {
-	if (Engine::get_singleton()->is_editor_hint())
+    if (Engine::get_singleton()->is_editor_hint())
         return;
-	set_linear_damp_mode(DampMode::DAMP_MODE_REPLACE);
-	set_angular_damp_mode(DampMode::DAMP_MODE_REPLACE);
-	set_linear_damp(0.0);
-	set_angular_damp(0.0);
-	engine = VehicleEngine(engine_data);
-	if (turbo_data != nullptr) {
-		engine.set_turbo(&turbo);
-		turbo.configure(turbo_data);
-	}
 
-	clutch_gearbox.set_engine(&engine);
+    // Setup is deliberately one-shot. Any invalid composition leaves the
+    // vehicle uninitialized and therefore inert for the remainder of its life.
+    if (initialized)
+        return;
 
-	if (gearbox_data.is_valid()) {
-		PackedFloat64Array ratios = gearbox_data->get_gear_ratios();
-		clutch_gearbox.gear_ratios.clear();
-		for (int i = 0; i < ratios.size(); i++)
-			clutch_gearbox.gear_ratios.push_back(ratios[i]);
-		
-		clutch_gearbox.final_drive = gearbox_data->get_final_drive();
-		clutch_gearbox.clutch_max_torque = gearbox_data->get_clutch_max_torque();
-		clutch_gearbox.reverse_ratio = gearbox_data->get_reverse_ratio();
+    std::vector<Axle *> setup_axles;
+    TypedArray<Node> children = get_children();
+    setup_axles.reserve(children.size());
+    for (int i = 0; i < children.size(); ++i) {
+        Axle *axle = Object::cast_to<Axle>(children[i]);
+        if (axle != nullptr)
+            setup_axles.push_back(axle);
+    }
 
-		gearbox_module.load_constraint(&clutch_gearbox, gearbox_data);
-	}
+    String setup_error;
+    if (!VehicleSetupValidation::validate(config, setup_axles, setup_error)) {
+        UtilityFunctions::printerr(String("Vehicle setup failed: ") + setup_error);
+        return;
+    }
 
-	TypedArray<Node> arr = get_children();
-	for (int i = 0; i < arr.size(); i++) {
-		Axle *iter = Object::cast_to<Axle>(arr[i]);
-		if (iter != nullptr) {
-			axles.push_back(iter);
-		}
-	}
-	int sz = axles.size();
-	real_t mass_per_axle = get_mass() / sz;
-	for (auto& i : axles)
-		i->compute_suspension_parameters(mass_per_axle, suspension_data);
+    set_linear_damp_mode(DampMode::DAMP_MODE_REPLACE);
+    set_angular_damp_mode(DampMode::DAMP_MODE_REPLACE);
+    set_linear_damp(0.0);
+    set_angular_damp(0.0);
 
+    running_gear.setup(setup_axles, get_mass(), config->get_suspension_data(),
+                       config->get_aero_data());
+    drivetrain.setup(config, running_gear.get_axles());
 
-	shaft_wheels_coupling.load_bodies(&drive_shaft, axles);
-
-	_compute_axle_dimensions();
-	emit_signal("vehicle_ready");
+    initialized = true;
+    emit_signal("vehicle_ready");
 }
 
 void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
-	RigidBody3D::_integrate_forces(state);
-	if (suspension_data == nullptr) return;
-	if (engine_data == nullptr) return;
-	
-	// suspension
-	Vector3 body_origin = state->get_transform().get_origin();
-	Vector3 com_global = state->get_transform().xform(state->get_center_of_mass());
-	Vector3 linear_velocity = state->get_linear_velocity();
-	Vector3 angular_velocity = state->get_angular_velocity();
+    RigidBody3D::_integrate_forces(state);
+    if (!initialized)
+        return;
 
-	_update_suspension(state, body_origin, com_global, linear_velocity, angular_velocity);
+    const Vector3 body_origin = state->get_transform().get_origin();
+    const Vector3 com_global = state->get_transform().xform(state->get_center_of_mass());
+    const Vector3 linear_velocity = state->get_linear_velocity();
+    const Vector3 angular_velocity = state->get_angular_velocity();
 
-	_apply_aerodynamics(linear_velocity, angular_velocity, body_origin);
+    // Explicit frame phases. Running gear applies suspension and aero forces
+    // before the drivetrain starts its frame/substep sequence.
+    running_gear.update_suspension(this, body_origin, com_global,
+                                   linear_velocity, angular_velocity);
+    running_gear.apply_aerodynamics(this, get_global_transform().basis,
+                                    linear_velocity, angular_velocity,
+                                    get_mass(), body_origin);
 
-	_handle_auto_gearbox();
-
-	if (gearbox_module.get_current_gear() < 0)
-		engine.throttle = brake_input;
-	else 
-		engine.throttle = tcs_enabled ? tcs.apply(throttle_input, get_linear_velocity().length(), axles) : throttle_input;  
-	
-
-	const real_t dt = state->get_step();
-	const real_t sub_dt = dt / substeps;
-
-	// Gear selection is evaluated once at frame time.  Clutch phase progress is
-	// advanced inside each drivetrain substep below so disengagement, dwell, and
-	// re-engagement are independent of the configured substep count.
-	gearbox_module.update_shifting_logic(dt);
-
-	const real_t wheel_brake = (gearbox_module.get_current_gear() < 0) ? throttle_input : brake_input;
-	const real_t speed_kph = get_speed_kph();
-
-	_run_drivetrain_substeps(state, com_global, linear_velocity, angular_velocity, 
-		sub_dt, wheel_brake, speed_kph, abs_enabled);
-
-
-	exhaust_system.update(dt, engine, gearbox_module, turbo);
-	
-
-
-	const real_t inv_substeps = real_t{1.0} / substeps;
-	for (auto &axle : axles)
-		for (auto& wh : axle->get_wheels()) {
-			const Vector3 avg_force = wh->tire_force * inv_substeps;
-			Vector3 offset = wh->collision_point - body_origin;
-			apply_force(avg_force, offset);
-			wh->cached_tire_force = avg_force;
-			wh->tire_force = Vector3(0,0,0);
-		}
-	
-}
-
-
-void Vehicle::_apply_aerodynamics(const Vector3 &linear_velocity, const Vector3 &angular_velocity, const Vector3 &body_origin) {
-	const AerodynamicsState state = aerodynamics.get_state(
-		get_global_transform().basis, linear_velocity, angular_velocity, get_mass(), axles);
-	const AerodynamicForces forces = aerodynamics.compute(state);
-
-	if (forces.drag.length_squared() > real_t{1e-8})
-		apply_central_force(forces.drag);
-	if (forces.yaw_control_torque.length_squared() > real_t{1e-8})
-		apply_torque(forces.yaw_control_torque);
-	_apply_downforce(forces.downforce, body_origin);
-}
-
-void Vehicle::_apply_downforce(real_t total_downforce, const Vector3 &body_origin) {
-	if (total_downforce > real_t{0.01}) {
-		for (auto *axle : axles) {
-			real_t axle_df = total_downforce * axle->downforce_ratio;
-			if (axle_df < real_t{0.01}) continue;
-			const auto &wheels = axle->get_wheels();
-			size_t grounded_wheels = 0;
-			for (auto *wh : wheels)
-				if (wh->is_on_ground()) ++grounded_wheels;
-			if (grounded_wheels == 0) continue;
-			real_t per_wheel = axle_df / static_cast<real_t>(grounded_wheels);
-			for (auto *wh : wheels) {
-				if (!wh->is_on_ground()) continue;
-				Vector3 off = wh->collision_point - body_origin;
-				apply_force(wh->collision_normal * -per_wheel, off);
-			}
-		}
-	}
-}
-
-
-void Vehicle::_update_suspension(PhysicsDirectBodyState3D *state, const Vector3 &body_origin, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity) {
-	for (auto& axle : axles) {
-		axle->update_physics(state, com_global, linear_velocity, angular_velocity);
-
-		const auto& wheels = axle->get_wheels();
-		if (wheels.size() >= 2 && wheels[0]->is_on_ground() && wheels[1]->is_on_ground()) {
-			const real_t force_0 = wheels[0]->get_suspension_rebound_force();
-			const real_t force_1 = wheels[1]->get_suspension_rebound_force();
-
-			// An anti-roll bar transfers load across the axle; it must neither pull
-			// against the ground nor create net vertical force when a wheel unloads.
-			const real_t arb_force = std::clamp(
-				axle->get_antiroll_bar_force(), -force_1, force_0);
-			wheels[0]->set_normal_force(force_0 - arb_force);
-			wheels[1]->set_normal_force(force_1 + arb_force);
-		}
-
-		for (auto *wheel : wheels) {
-			if (!wheel->is_on_ground()) continue;
-			Vector3 offset = wheel->collision_point - body_origin;
-			apply_force(wheel->collision_normal * wheel->get_suspension_rebound_force(), offset);
-		}
-	}
-}
-
-void Vehicle::_run_drivetrain_substeps(PhysicsDirectBodyState3D *state, const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity, real_t sub_dt, real_t wheel_brake, real_t speed_kph, bool abs_enabled) {
-	_begin_reflected_load_frame();
-
-	for (int s = 0; s < substeps; ++s) {
-		gearbox_module.update_clutch_logic(sub_dt, wheel_brake, throttle_input);
-		// A substep can complete the gear-change dwell.  Revalidate the
-		// reflected-load coordinate immediately so an old-ratio estimate cannot
-		// reach the clutch solve below.
-		_begin_reflected_load_frame();
-		engine.accumulate_torque(sub_dt);
-		// Solve steering and tires before the drivetrain projection. This leaves
-		// current tire and brake reaction torques on the wheel bodies so the
-		// simultaneous shaft-plus-driven-wheel prediction sees the same pending
-		// loads that will be integrated for this substep.
-		for (auto &ax : axles) {
-			if (ax->is_steerable) {
-				ax->solve_steering(steer_input, sub_dt, speed_kph);
-				ax->set_wheels_rotation();
-			}
-			ax->solve_tire(state, com_global, linear_velocity, angular_velocity, sub_dt, wheel_brake, abs_enabled);
-		}
-
-		// Refresh for diagnostics and the next frame's topology lifecycle. The
-		// current reaction is already pending on the wheel body and must not also
-		// be fed to ClutchGearConstraint as an engine-side reflected load.
-		_refresh_reflected_load_cache();
-
-		// VehicleEngine::get_torque() reports curve/throttle torque only. The
-		// accumulator also contains rev-cut, friction, engine braking and idle
-		// torque. Predict clutch slip against the physical shaft+driven-wheel
-		// aggregate without re-injecting the same current tire reaction through
-		// the reflected-load argument; ShaftWheelsCouplingConstraint consumes it
-		// directly below.
-		clutch_gearbox.set_aggregate_output_state(
-			shaft_wheels_coupling.get_aggregate_inertia(),
-			shaft_wheels_coupling.get_predicted_aggregate_angular_velocity(sub_dt));
-		clutch_gearbox.solve(sub_dt, engine.get_accumulated_torque(), real_t{0.0});
-		clutch_gearbox.clear_aggregate_output_state();
-		shaft_wheels_coupling.solve(sub_dt);
-
-		engine.integrate(sub_dt);
-		drive_shaft.integrate(sub_dt);
-
-		for(auto &axle : axles)
-			axle->integrate(sub_dt);
-	}
-}
-
-bool Vehicle::_has_reflected_load_topology(real_t ratio) const {
-	if (!std::isfinite(ratio) || std::abs(ratio) <= real_t{1e-8})
-		return false;
-
-	for (const auto *ax : axles) {
-		if (ax == nullptr || ax->drive_ratio <= real_t{0.0})
-			continue;
-		for (const auto *wh : ax->get_wheels()) {
-			if (wh != nullptr && wh->is_on_ground())
-				return true;
-		}
-	}
-	return false;
-}
-
-void Vehicle::_reset_reflected_load_cache() {
-	reflected_load_cache = real_t{0.0};
-	reflected_load_ratio = real_t{0.0};
-	reflected_load_valid = false;
-}
-
-void Vehicle::_begin_reflected_load_frame() {
-	const real_t ratio = clutch_gearbox.get_effective_ratio();
-	if (!_has_reflected_load_topology(ratio)) {
-		_reset_reflected_load_cache();
-		return;
-	}
-
-	// A gear/ratio change invalidates the old estimate; it was expressed in a
-	// different engine-side coordinate and must not leak into this frame.
-	if (reflected_load_valid &&
-			std::abs(reflected_load_ratio - ratio) > real_t{1e-8})
-		_reset_reflected_load_cache();
-	reflected_load_ratio = ratio;
-}
-
-void Vehicle::_refresh_reflected_load_cache() {
-	const real_t ratio = clutch_gearbox.get_effective_ratio();
-	if (!_has_reflected_load_topology(ratio)) {
-		_reset_reflected_load_cache();
-		return;
-	}
-
-	const real_t load = _compute_reflected_load();
-	if (!std::isfinite(load)) {
-		_reset_reflected_load_cache();
-		return;
-	}
-	reflected_load_cache = load;
-	reflected_load_ratio = ratio;
-	reflected_load_valid = true;
-}
-
-real_t Vehicle::_compute_reflected_load() const {
-	const real_t ratio = clutch_gearbox.get_effective_ratio();
-	if (!_has_reflected_load_topology(ratio))
-		return real_t{0.0};
-
-	real_t load = 0.0;
-	for (auto &ax : axles) {
-		if (ax == nullptr || ax->drive_ratio <= real_t{0.0})
-			continue;
-		for (auto *wh : ax->get_wheels()) {
-			if (wh != nullptr && wh->is_on_ground())
-				load += (-wh->reaction_torque) / ratio * ax->drive_ratio;
-		}
-	}
-	return load;
-}
-
-void Vehicle::_handle_auto_gearbox() {
-	if (!gearbox_module.is_automatic() || gearbox_module.is_shifting())
-		return;
-
-	const real_t speed = get_speed_kph();
-	if (speed >= 0.5)
-		return;
-
-	const int gear = gearbox_module.get_current_gear();
-	if (gear > 0 && brake_input > 0.3 && throttle_input < 0.05)
-		gearbox_module.select_reverse();
-	else if (gear < 0 && throttle_input > 0.1 && brake_input < 0.05)
-		gearbox_module.select_drive();
-}
-
-void Vehicle::_compute_axle_dimensions() {
-    // Compute trackwidth for each axle (distance between its two wheels)
-    for (auto* axle : axles) {
-        const auto& wheels = axle->get_wheels();
-        if (wheels.size() >= 2) {
-            real_t tw = wheels[0]->get_global_position()
-                            .distance_to(wheels[1]->get_global_position());
-            axle->set_trackwidth(tw);
-        }
+    drivetrain.handle_auto_gearbox(get_speed_kph(), brake_input, throttle_input);
+    if (drivetrain.is_reverse()) {
+        drivetrain.set_throttle(brake_input);
+    } else {
+        const real_t throttle = tcs_enabled
+            ? running_gear.apply_traction_control(throttle_input, get_linear_velocity().length())
+            : throttle_input;
+        drivetrain.set_throttle(throttle);
     }
 
-    // Compute wheelbase (max distance between any two axles)
-    if (axles.size() >= 2) {
-        real_t wb = 0.0;
-        for (size_t i = 0; i < axles.size(); ++i) {
-            for (size_t j = i + 1; j < axles.size(); ++j) {
-                real_t dist = axles[i]->get_global_position()
-                                  .distance_to(axles[j]->get_global_position());
-                wb = std::max(wb, dist);
-            }
-        }
-        for (auto* axle : axles)
-            axle->set_wheelbase(wb);
+    const real_t dt = state->get_step();
+    const real_t sub_dt = dt / static_cast<real_t>(substeps);
+
+    // Gear selection is evaluated once at frame time. Clutch phase progress is
+    // advanced inside each drivetrain substep below.
+    drivetrain.update_shifting_logic(dt);
+
+    const real_t wheel_brake = drivetrain.is_reverse() ? throttle_input : brake_input;
+    const real_t speed_kph = get_speed_kph();
+
+    for (int substep = 0; substep < substeps; ++substep) {
+        drivetrain.update_clutch_logic(sub_dt, wheel_brake, throttle_input);
+        drivetrain.accumulate_engine_torque(sub_dt);
+
+        // Current tire and brake reaction torques remain pending on wheel
+        // bodies so coupling sees exactly the loads integrated below.
+        running_gear.solve_steering_and_tires(
+            com_global, linear_velocity, angular_velocity, sub_dt,
+            steer_input, wheel_brake, speed_kph, abs_enabled);
+
+        drivetrain.solve_clutch(sub_dt);
+        drivetrain.solve_coupling(sub_dt);
+
+        drivetrain.integrate_bodies(sub_dt);
+        running_gear.integrate_wheels(sub_dt);
     }
+
+    running_gear.apply_tire_forces(this, body_origin, substeps);
 }
 
 void Vehicle::set_throttle_input(real_t value) {
@@ -401,10 +152,6 @@ void Vehicle::set_steer_input(real_t value) {
     steer_input = std::clamp(value, real_t{-1.0}, real_t{1.0});
 }
 
-real_t Vehicle::get_speed_kph() const {
-    return get_linear_velocity().length() * 3.6;
-}
-
 void Vehicle::set_brake_input(real_t value) {
     brake_input = std::clamp(value, real_t{0.0}, real_t{1.0});
 }
@@ -413,23 +160,60 @@ void Vehicle::set_tcs_enabled(bool value) {
     tcs_enabled = value;
 }
 
-void Vehicle::set_shift_input(int value) {
-    shift_input = std::clamp(value, -1, 1);
-    if (shift_input == 1)
-        gearbox_module.shift_up();
-    else if (shift_input == -1)
-        gearbox_module.shift_down();
+void Vehicle::set_config(const Ref<VehicleConfig> &value) {
+    if (initialized) {
+        UtilityFunctions::printerr("Vehicle config cannot be replaced after initialization.");
+        return;
+    }
+    config = value;
+}
+
+void Vehicle::shift_up() {
+    drivetrain.shift_up();
+}
+
+void Vehicle::shift_down() {
+    drivetrain.shift_down();
+}
+
+void Vehicle::select_drive() {
+    drivetrain.select_drive();
+}
+
+void Vehicle::select_neutral() {
+    drivetrain.select_neutral();
+}
+
+void Vehicle::select_reverse() {
+    drivetrain.select_reverse();
 }
 
 void Vehicle::set_substeps(int value) {
     substeps = std::clamp(value, 1, 1024);
 }
 
-void Vehicle::set_aero_data(const Ref<VehicleAerodynamicsData>& a) {
-    aero_data = a;
-    aerodynamics.load_parameters(aero_data);
+real_t Vehicle::get_speed_kph() const {
+    return get_linear_velocity().length() * 3.6;
 }
 
+VehicleTelemetrySnapshot Vehicle::get_telemetry_snapshot() const {
+    constexpr real_t ang_to_rpm = 60.0 / (2.0 * Math_PI);
 
+    const VehicleEngine &engine = drivetrain.get_engine();
+    const Gearbox &gearbox = drivetrain.get_gearbox();
+    const RotationalBody &drive_shaft = drivetrain.get_driveshaft();
 
+    VehicleTelemetrySnapshot snapshot;
+    snapshot.engine_rpm = engine.get_rpm();
+    snapshot.engine_torque = engine.get_torque();
+    snapshot.engine_throttle = throttle_input;
+    snapshot.driveshaft_rpm = drive_shaft.get_angular_velocity() * ang_to_rpm;
+    snapshot.clutch_engagement = gearbox.get_clutch_engagement();
+    snapshot.current_gear = gearbox.get_current_gear();
+    snapshot.gear_ratio = gearbox.get_effective_ratio();
+    snapshot.vehicle_speed_kph = get_speed_kph();
+    snapshot.turbo_boost = engine.get_turbo_boost();
+    return snapshot;
 }
+
+} // namespace godot

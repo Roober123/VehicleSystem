@@ -3,7 +3,7 @@
 
 namespace godot {
 
-real_t VehicleEngine::get_rpm_normalized() {
+real_t VehicleEngine::get_rpm_normalized() const {
 	if (torque_curve.is_null()) return 0.0;
 	constexpr real_t ang_to_rpm = 60.0 / (2.0 * Math_PI);
 	real_t rpm = angular_velocity * ang_to_rpm;
@@ -12,20 +12,8 @@ real_t VehicleEngine::get_rpm_normalized() {
 	return t;
 }
 
-real_t VehicleEngine::get_torque() {
-	if (torque_curve.is_null()) return 0.0;
-	real_t tq_point = get_rpm_normalized();
-	real_t tq = torque_curve->sample_baked(tq_point) * throttle * max_torque;
-	if (turbo != nullptr) tq *= (1.0 + turbo->get_boost());
-	return tq;
-}
-
-real_t VehicleEngine::get_available_torque() {
-	if (torque_curve.is_null()) return 0.0;
-	real_t tq_point = get_rpm_normalized();
-	real_t tq = torque_curve->sample_baked(tq_point) * max_torque;
-	if (turbo != nullptr) tq = tq * (1.0 + turbo->get_boost());
-	return tq;
+real_t VehicleEngine::get_torque() const {
+	return effective_drive_torque;
 }
 
 void VehicleEngine::accumulate_torque(real_t dt) {
@@ -41,11 +29,17 @@ void VehicleEngine::accumulate_torque(real_t dt) {
 	
 	if (turbo != nullptr)
 		turbo->update(dt, rpm, effective_throttle);
-	RotationalBody::add_torque(get_available_torque() * effective_throttle);
 
-	// Internal friction drag
-	if (rpm > idle_rpm)
-		RotationalBody::add_torque(-drag * angular_velocity);
+	// Sample the engine curve once for this substep. The cached result is the
+	// exact drive torque applied below, including rev cut, turbo boost, and
+	// effective throttle, so telemetry does not resample the curve.
+	const real_t curve_multiplier = torque_curve.is_null()
+		? real_t{0.0}
+		: torque_curve->sample_baked(get_rpm_normalized());
+	const real_t boosted_torque = curve_multiplier * max_torque *
+		(turbo != nullptr ? real_t{1.0} + turbo->get_boost() : real_t{1.0});
+	effective_drive_torque = boosted_torque * effective_throttle;
+	RotationalBody::add_torque(effective_drive_torque);
 
 	// Engine braking
 	if (effective_throttle < real_t{0.01} && rpm > idle_rpm) {
@@ -74,34 +68,16 @@ void VehicleEngine::integrate(real_t dt) {
 	
 	
 
-	angular_velocity += torque / inertia * dt;
-	angle += angular_velocity * dt;
-	torque = 0.0;
+	RotationalBody::integrate(dt);
 
 	constexpr real_t hard_limit_margin = real_t{1.05};
 	if (rpm > redline_rpm * hard_limit_margin)
 		angular_velocity = redline_rpm * hard_limit_margin / ang_to_rpm;
 }
 
-real_t VehicleEngine::get_current_horsepower() {
-	constexpr real_t ang_to_rpm = 60.0 / (2.0 * Math_PI);
-	constexpr real_t HP_FACTOR = 5252.0 / 0.737562;
-
-	real_t rpm = angular_velocity * ang_to_rpm;
-	return get_current_torque() * rpm / HP_FACTOR;
-}
-
-real_t VehicleEngine::get_turbo_boost() {
+real_t VehicleEngine::get_turbo_boost() const {
 	if (turbo == nullptr) return 0.0;
 	return turbo->get_boost();
-}
-
-real_t VehicleEngine::get_current_torque() {
-	if (torque_curve.is_null()) return 0.0;
-	real_t tq_point = get_rpm_normalized();
-	real_t tq = torque_curve->sample_baked(tq_point) * throttle * max_torque;
-	if (turbo != nullptr) tq *= real_t{1.0} + turbo->get_boost();
-	return tq;
 }
 
 }

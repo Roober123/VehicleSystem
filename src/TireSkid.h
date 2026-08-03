@@ -8,10 +8,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/variant/color.hpp"
 #include "godot_cpp/variant/vector3.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
-#include <algorithm>
 #include <array>
-#include <cmath>
 
 namespace godot {
 
@@ -57,9 +54,6 @@ private:
     static constexpr int MAX_RIBBONS = 16;
     static constexpr real_t POINT_SPACING = real_t{0.3};
     static constexpr real_t GROUND_OFFSET = real_t{0.005};
-    static constexpr real_t LIFETIME = real_t{20.0};
-
-
     std::array<SkidRibbon, MAX_RIBBONS> ribbons;
     int active_ribbon_index = -1;
 

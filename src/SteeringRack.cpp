@@ -1,10 +1,10 @@
 #include "SteeringRack.h"
 #include <algorithm>
+#include <cmath>
 
 namespace godot {
 
 void SteeringRack::load(const Ref<SteeringRackData>& s) {
-    configured = false;
     if (s.is_null())
         return;
 
@@ -15,11 +15,10 @@ void SteeringRack::load(const Ref<SteeringRackData>& s) {
     proportional_gain = s->get_proportional_gain();
     derivative_gain = s->get_derivative_gain();
     sat_gain = s->get_sat_gain();
-    configured = true;
 }
 
 void SteeringRack::solve(real_t steer_input, real_t sat_torque, real_t dt, real_t speed_kph) {
-    if (!configured || dt <= real_t{0.0})
+    if (!std::isfinite(dt) || dt <= real_t{0.0})
         return;
 
     real_t speed_factor = 1.0 / (1.0 + speed_kph * real_t{0.02});

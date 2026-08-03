@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DifferentialData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Configuration for an axle or center differential.
+	</brief_description>
+	<description>
+		DifferentialData selects an [code]OPEN[/code], [code]LIMITED_SLIP[/code], or [code]LOCKED[/code] relative-motion policy. Axle differentials operate between two wheel outputs; a center differential operates between two driven-axle carriers. In [code]LIMITED_SLIP[/code], lock capacity is [code]min(max_lock_torque, preload_torque + active_lock_ratio * abs(transmitted_torque) + slip_sensitive_gain * abs(relative_speed))[/code]. The active ratio is [member power_lock_ratio] when transmitted torque times carrier speed is non-negative (power) and [member coast_lock_ratio] otherwise (coast). All lock fields are inactive in [code]OPEN[/code] and [code]LOCKED[/code]. Solver snapshots are copied at setup and the solve path performs no dynamic allocation.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_mode" qualifiers="">
+			<return type="void" /><param index="0" name="mode" type="int" />
+			<description>Sets the differential mode: Open, Limited Slip, or Locked.</description>
+		</method>
+		<method name="get_mode" qualifiers="const">
+			<return type="int" /><description>Returns the configured differential mode.</description>
+		</method>
+		<method name="set_preload_torque" qualifiers="">
+			<return type="void" /><param index="0" name="value" type="float" />
+			<description>Sets the baseline limited-slip locking torque. Default: 25 Nm.</description>
+		</method>
+		<method name="get_preload_torque" qualifiers="const">
+			<return type="float" /><description>Returns the baseline limited-slip locking torque (default 25 Nm).</description>
+		</method>
+		<method name="set_power_lock_ratio" qualifiers="">
+			<return type="void" /><param index="0" name="value" type="float" />
+			<description>Sets the limited-slip lock ratio used for positive transmitted power. Default: 0.35.</description>
+		</method>
+		<method name="get_power_lock_ratio" qualifiers="const">
+			<return type="float" /><description>Returns the positive-power limited-slip lock ratio (default 0.35).</description>
+		</method>
+		<method name="set_coast_lock_ratio" qualifiers="">
+			<return type="void" /><param index="0" name="value" type="float" />
+			<description>Sets the limited-slip lock ratio used during coast or engine braking. Default: 0.15.</description>
+		</method>
+		<method name="get_coast_lock_ratio" qualifiers="const">
+			<return type="float" /><description>Returns the coast limited-slip lock ratio (default 0.15).</description>
+		</method>
+		<method name="set_slip_sensitive_gain" qualifiers="">
+			<return type="void" /><param index="0" name="value" type="float" />
+			<description>Sets the bounded lock-capacity gain per rad/s of relative speed. Default: 2 Nm per rad/s.</description>
+		</method>
+		<method name="get_slip_sensitive_gain" qualifiers="const">
+			<return type="float" /><description>Returns the relative-speed lock-capacity gain (default 2 Nm per rad/s).</description>
+		</method>
+		<method name="set_max_lock_torque" qualifiers="">
+			<return type="void" /><param index="0" name="value" type="float" />
+			<description>Sets the maximum limited-slip locking torque cap. Default: 250 Nm.</description>
+		</method>
+		<method name="get_max_lock_torque" qualifiers="const">
+			<return type="float" /><description>Returns the maximum limited-slip locking torque cap (default 250 Nm).</description>
+		</method>
+	</methods>
+	<members>
+		<member name="mode" type="int" setter="set_mode" getter="get_mode" enum="DifferentialData.Mode" default="0">Open (0), Limited Slip (1), or Locked (2).</member>
+		<member name="preload_torque" type="float" setter="set_preload_torque" getter="get_preload_torque" default="25.0">Baseline limited-slip locking torque in Nm. Inactive for Open and Locked modes.</member>
+		<member name="power_lock_ratio" type="float" setter="set_power_lock_ratio" getter="get_power_lock_ratio" default="0.35">Lock ratio when transmitted torque times carrier velocity is non-negative. Inactive for Open and Locked modes.</member>
+		<member name="coast_lock_ratio" type="float" setter="set_coast_lock_ratio" getter="get_coast_lock_ratio" default="0.15">Lock ratio when transmitted torque times carrier velocity is negative. Inactive for Open and Locked modes.</member>
+		<member name="slip_sensitive_gain" type="float" setter="set_slip_sensitive_gain" getter="get_slip_sensitive_gain" default="2.0">Lock-capacity gain in Nm per rad/s of relative speed. Inactive for Open and Locked modes.</member>
+		<member name="max_lock_torque" type="float" setter="set_max_lock_torque" getter="get_max_lock_torque" default="250.0">Maximum limited-slip lock capacity in Nm. Inactive for Open and Locked modes.</member>
+	</members>
+</class>

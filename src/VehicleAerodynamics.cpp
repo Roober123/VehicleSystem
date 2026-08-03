@@ -27,7 +27,7 @@ AerodynamicsState VehicleAerodynamics::get_state(const Basis &body_basis,
             trackwidth_sum += axle->get_trackwidth();
             ++track_count;
         }
-        if (axle->is_steerable) {
+        if (axle->get_steerable()) {
             steer_angle_sum += axle->get_steer_angle();
             ++steerable_count;
         }
@@ -91,8 +91,15 @@ Vector3 VehicleAerodynamics::_compute_yaw_control(const AerodynamicsState &state
 }
 
 void VehicleAerodynamics::load_parameters(const Ref<VehicleAerodynamicsData>& a) {
-    if (a.is_null())
+    if (a.is_null()) {
+        drag_coefficient = 0.0;
+        downforce_coefficient = 0.0;
+        yaw_damping_coefficient = 0.0;
+        yaw_control_min_speed = 0.0;
+        yaw_control_max_torque = 0.0;
+        yaw_control_max_lateral_acceleration = 0.0;
         return;
+    }
     drag_coefficient = a->get_drag_coefficient();
     downforce_coefficient = a->get_downforce_coefficient();
     yaw_damping_coefficient = a->get_yaw_damping_coefficient();

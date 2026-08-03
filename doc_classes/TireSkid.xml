@@ -6,7 +6,7 @@
 	<description>
 		TireSkid is a [Node3D] that creates and manages skid mark ribbons. It is created automatically as a child of each [Wheel] node and should not be added manually. Skid marks are rendered as triangle-strip ribbons on a procedurally generated [ArrayMesh].
 
-		The skid system uses fixed-size ring buffers for performance (no runtime allocations). Once a ribbon reaches its maximum point count or the tire stops sliding, the ribbon is finalized and fades out over [code]LIFETIME[/code] seconds before being recycled.
+		The skid system uses a fixed-size pool of ribbons. A ribbon is finalized when it reaches its point limit or the tire stops sliding; completed ribbons age for pool-reuse selection. No fade or lifetime visual effect is promised by this class.
 
 		[b]Note:[/b] TireSkid reparents itself to the current scene root on ready, so skid marks stay in world space even if the vehicle moves.
 	</description>

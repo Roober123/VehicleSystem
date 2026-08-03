@@ -51,14 +51,6 @@ public:
     AerodynamicForces compute(const AerodynamicsState &state) const;
 
     void load_parameters(const Ref<VehicleAerodynamicsData>& a);
-    void set_drag_coefficient(real_t v) { drag_coefficient = v; }
-    real_t get_drag_coefficient() const { return drag_coefficient; }
-
-    void set_downforce_coefficient(real_t v) { downforce_coefficient = v; }
-    real_t get_downforce_coefficient() const { return downforce_coefficient; }
-
-    void set_yaw_damping_coefficient(real_t v) { yaw_damping_coefficient = v; }
-    real_t get_yaw_damping_coefficient() const { return yaw_damping_coefficient; }
 };
 
 } // namespace godot

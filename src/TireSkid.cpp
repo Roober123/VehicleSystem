@@ -2,6 +2,8 @@
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
 
+#include <cmath>
+
 namespace godot {
 
 void TireSkid::_bind_methods() {
@@ -21,10 +23,8 @@ void TireSkid::_ready() {
 
     material.instantiate();
     material->set_albedo(Color(real_t{0.05}, real_t{0.05}, real_t{0.05}, real_t{1.0}));
-   // material->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
     material->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
     material->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
-    //material->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 
     // Create mesh instance
     mesh_instance = memnew(MeshInstance3D);
@@ -115,7 +115,6 @@ int TireSkid::_find_or_create_active_ribbon() {
             oldest_idx = i;
 
     if (oldest_idx < 0) {
-        //UtilityFunctions::print("[TireSkid] ERROR: no free ribbons!");
         return -1;
     }
 
@@ -176,14 +175,6 @@ void TireSkid::_rebuild_mesh() {
         const SkidRibbon &rib = ribbons[r];
         if (rib.point_count < 2)
             continue;
-
-        // Finished ribbons fade out
-        /*
-        real_t fade = real_t{1.0};
-        if (!rib.active) {
-            fade = real_t{1.0} - (rib.age / LIFETIME);
-            fade = std::clamp(fade, real_t{0.0}, real_t{1.0});
-        }*/
 
         for (int i = 0; i < rib.point_count; ++i) {
             const SkidPoint &pt = rib.points[i];

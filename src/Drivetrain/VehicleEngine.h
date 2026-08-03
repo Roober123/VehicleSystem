@@ -2,8 +2,6 @@
 #include "RotationalBody.h"
 #include "godot_cpp/classes/curve.hpp"
 #include "Resources/vehicle_engine_data.h"
-#include <cmath>
-#include <algorithm>
 #include "Drivetrain/Turbo.h"
 
 
@@ -18,6 +16,7 @@ class VehicleEngine : public RotationalBody {
 
     bool rev_limit_cut = false;
     real_t rev_limit_timer = 0.0;
+    real_t effective_drive_torque = 0.0;
 
     Turbo* turbo = nullptr;
     
@@ -40,15 +39,12 @@ class VehicleEngine : public RotationalBody {
     
     void set_turbo(Turbo *t) { turbo = t; }
 
-    real_t get_rpm_normalized();
-    real_t get_torque();
-    real_t get_available_torque();
+    real_t get_rpm_normalized() const;
+    real_t get_torque() const;
     real_t get_idle_rpm() const { return idle_rpm; }
     real_t get_redline_rpm() const { return redline_rpm; }
-    real_t get_current_torque();
-    real_t get_current_horsepower();
-    real_t get_turbo_boost();
-    real_t get_rpm() { return angular_velocity * 60.0 / 2.0 / Math_PI; }
+    real_t get_turbo_boost() const;
+    real_t get_rpm() const { return angular_velocity * 60.0 / 2.0 / Math_PI; }
 
     void accumulate_torque(real_t dt);
     void integrate(real_t dt);

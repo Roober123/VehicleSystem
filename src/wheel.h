@@ -3,19 +3,17 @@
 #include "godot_cpp/classes/node3d.hpp"
 #include "godot_cpp/classes/ray_cast3d.hpp"
 #include "godot_cpp/core/class_db.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/classes/ref.hpp"
-#include "godot_cpp/classes/engine.hpp"
-#include "godot_cpp/classes/physics_direct_body_state3d.hpp"
-#include "godot_cpp/classes/physics_direct_body_state3d_extension.hpp"
 #include "Drivetrain/RotationalBody.h"
 #include "TireSkid.h"
 
 #include "godot_cpp/classes/curve.hpp"
-#include "Resources/suspension_data.h"
 #include "Resources/tire_data.h"
 
 namespace godot {
+
+class Axle;
+class ShaftWheelsCouplingConstraint;
 
 class Wheel : public Node3D {
     GDCLASS(Wheel, Node3D);
@@ -23,6 +21,7 @@ class Wheel : public Node3D {
     real_t stiffness = 1.0;
     real_t damping = 1.0;
     real_t suspension_length = 1.0;
+    real_t tire_width = 0.3;
     real_t suspension_rebound_force = 0.0;
     real_t radius = 0.3;
     real_t friction_forward = 1.0;
@@ -39,6 +38,11 @@ class Wheel : public Node3D {
     // Friction curve resources (sampled with normalized slip)
     Ref<Curve> forward_friction_curve;
     Ref<Curve> lateral_friction_curve;
+
+    RotationalBody body;
+
+    friend class Axle;
+    friend class ShaftWheelsCouplingConstraint;
 
     void add_physics();
     void _compute_sat(real_t lateral_force);
@@ -87,59 +91,42 @@ class Wheel : public Node3D {
 
     
 
-    RotationalBody body;
-
     RayCast3D *ray = nullptr;
     TireSkid *skid = nullptr;
     void set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load);
     void set_tire(const Ref<TireData>& t);
+    void add_drive_torque(real_t torque) { body.add_torque(torque); }
+    void integrate_rotation(real_t dt) { body.integrate(dt); }
     /// Returns the final non-tensile contact force, including anti-roll load transfer.
     real_t get_suspension_rebound_force() const { return suspension_rebound_force; }
     /// Sets the final normal contact force used by both suspension and tire forces.
     void set_normal_force(real_t force);
-    real_t get_stiffness() const { return stiffness; }
     /// Returns the wheel's angular velocity in rad/s.
     real_t get_angular_velocity() const { return body.get_angular_velocity(); }
     /// Returns the average tire force (world-space) applied last frame.
     Vector3 get_tire_force() const { return cached_tire_force; }
-    /// Returns the drivetrain reaction torque at this wheel.
-    float get_reaction_torque() const { return reaction_torque; }
     /// Returns the world-space position where the wheel contacts the ground.
     Vector3 get_collision_point() const { return collision_point; }
     /// Returns the collision normal at the contact point.
     Vector3 get_collision_normal() const { return collision_normal; }
     /// Returns true if the wheel raycast is currently touching a surface.
     bool is_on_ground() const { return on_ground; }
-    /// Returns the effective mass (kg) supported by this wheel from suspension.
-    real_t get_sustained_mass() const { return sustained_mass; }
-    /// Returns the suspension compression ratio (0 = fully extended, 1 = fully compressed).
-    real_t get_compression() const { return compression; }
-    /// Returns the self-aligning torque (Nm) at the steering axis from tire forces.
-    real_t get_self_aligning_torque() const { return self_aligning_torque; }
     /// Returns the longitudinal slip ratio (tire_speed - road_speed) / road_speed.
     /// 0 = rolling, 1 = spinning, -1 = locked.
     real_t get_slip_ratio() const { return slip_ratio; }
-    /// Returns the lateral slip angle in degrees. 0 = straight, >0 = sliding.
-    real_t get_slip_angle() const { return slip_angle; }
-    /// Returns true if ABS is actively modulating brake pressure this frame.
-    bool get_abs_active() const { return abs_active; }
-    /// Returns true if the wheel is currently sliding (excessive slip ratio or slip angle).
-    bool get_is_sliding() const { return is_sliding; }
 
-    real_t sustained_mass = 0.0;
     real_t compression = 0.0;
     Vector3 collision_point;
     Vector3 collision_normal;
     Vector3 forward_vector;
     Vector3 right_vector;
-    Vector3 up_vector;
     bool on_ground = false;
     bool is_sliding = false;
 
-    void update_suspension(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &com_global, 
+    void update_suspension(const Vector3 &com_global,
                            const Vector3 &linear_velocity, const Vector3 &angular_velocity);
 
-    void solve_tire(PhysicsDirectBodyState3D* vehicle_state, const Vector3 &com_global, 
+    void solve_tire(const Vector3 &com_global,
                     const Vector3 &linear_velocity, const Vector3 &angular_velocity, real_t dt,
                     real_t brake_input, bool abs_enabled = true);
     
