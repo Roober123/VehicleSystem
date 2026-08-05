@@ -28,7 +28,7 @@
 			Derivative gain of the steering rack P-D controller. Higher values damp steering velocity.
 		</member>
 		<member name="sat_gain" type="float" setter="set_sat_gain" getter="get_sat_gain" default="0.5">
-			Gain applied to self-aligning torque feedback into the steering rack. Higher values give stronger centering feel.
+			Scales self-aligning torque feedback into the steering rack. Zero proportional-derivative torque grants no SAT authority; opposing SAT is capped at the P-D torque magnitude, while assisting SAT remains unrestricted. Higher values give stronger feedback.
 		</member>
 	</members>
 </class>

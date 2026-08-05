@@ -35,6 +35,8 @@ void Wheel::set_tire(const Ref<TireData>& t) {
     this->tire_width = t->tire_width;
     this->brake_power = t->brake_power;
     this->peak_slip_angle = t->peak_slip_angle;
+    this->pneumatic_trail = t->get_pneumatic_trail();
+    this->mechanical_trail = t->get_mechanical_trail();
     this->relaxation_low = t->relaxation_low;
     this->relaxation_high = t->relaxation_high;
     this->load_sensitivity = t->get_load_sensitivity();
@@ -215,13 +217,14 @@ real_t Wheel::_apply_abs(real_t brake_input, real_t fwd_speed, real_t dt) {
 }
 
 void Wheel::_compute_sat(real_t lateral_force) {
-    constexpr real_t base_trail = real_t{0.04}; // 40 mm
-    const real_t normal = _compute_normal_force();
-    real_t max_lateral = normal * friction_lateral * _get_load_sensitivity_scale(normal);
-    real_t load_ratio = std::abs(lateral_force) / std::max(max_lateral, real_t{1e-6});
-    load_ratio = std::min(load_ratio, real_t{1.0});
-    real_t trail = base_trail * (real_t{1.0} - load_ratio) * (real_t{1.0} - load_ratio);
-    self_aligning_torque = -trail * lateral_force;
+    const real_t normalized_slip = std::clamp(
+        std::abs(slip_angle) / peak_slip_angle, real_t{0.0}, real_t{1.0});
+    const real_t pneumatic_weight = (real_t{1.0} - normalized_slip) *
+                                    (real_t{1.0} - normalized_slip);
+    const real_t trail = mechanical_trail + pneumatic_trail * pneumatic_weight;
+    // Lateral tire force is applied as -right_tangent*lateral_force.  SAT
+    // must oppose that world force to center the steered wheel.
+    self_aligning_torque = lateral_force * trail;
 }
 
 void Wheel::_compute_tangents(Vector3& fwd_tangent, Vector3& right_tangent) const {

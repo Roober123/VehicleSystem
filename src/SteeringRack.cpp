@@ -28,14 +28,16 @@ void SteeringRack::solve(real_t steer_input, real_t sat_torque, real_t dt, real_
     real_t error = target_angle - angle;
     real_t driver_torque = proportional_gain * error - derivative_gain * angular_velocity;
     sat_torque *= sat_gain;
-    // Cap SAT so it cannot exceed driver authority (prevents steering lockup)
-    real_t max_sat = proportional_gain * max_angle * real_t{0.8};
-    sat_torque = std::clamp(sat_torque, -max_sat, max_sat);
 
-    bool sat_opposes = (sat_torque > real_t{0.0}) != (driver_torque > real_t{0.0});
-    if (sat_opposes) {
-        real_t sat_limit = std::abs(driver_torque) * real_t{0.3};
-        sat_torque = std::clamp(sat_torque, -sat_limit, sat_limit);
+    // SAT may assist the player/PD torque without an artificial cap.  With no
+    // player/PD torque, SAT has no authority to initiate rack motion.  When
+    // it opposes a non-zero command, cap only its magnitude so the combined
+    // command cannot reverse the player's authority.
+    if (driver_torque == real_t{0.0}) {
+        sat_torque = real_t{0.0};
+    } else if ((sat_torque > real_t{0.0}) != (driver_torque > real_t{0.0})) {
+        sat_torque = std::copysign(
+            std::min(std::abs(sat_torque), std::abs(driver_torque)), sat_torque);
     }
     real_t friction_torque = friction_coefficient * tanh(angular_velocity * 5.0);
     real_t total_torque = driver_torque + sat_torque - friction_torque;

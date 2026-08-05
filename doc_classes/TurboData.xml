@@ -1,33 +1,22 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="TurboData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A resource that defines turbocharger characteristics: spool rates, max boost, and RPM ranges.
+		Authoring data for the optional, load-driven turbocharger model.
 	</brief_description>
 	<description>
-		TurboData is a [Resource] that configures a turbocharger simulation for the vehicle's engine. The turbo builds boost progressively based on engine RPM and exhaust flow, adding extra torque above atmospheric pressure.
-
-		Boost pressure follows a curve: it starts building at [member start_rpm], reaches maximum at [member max_boost_rpm], and optionally falls off after [member fall_rpm]. The [member spool_up] and [member spool_down] rates control how quickly boost responds to throttle changes.
+		TurboData configures the value-owned turbo state used by a vehicle engine. Values are authored within their Inspector ranges and supplied through a valid resource/configuration; Turbo::update assumes a positive physics timestep from its caller. Configuration copies the three properties directly. The runtime keeps normalized shaft energy and delivered boost as separate states. Shaft energy is driven by effective throttle, normalized base-engine torque, and engine RPM relative to [member full_boost_rpm]. The compressor target is [member max_boost_bar] multiplied by squared shaft energy; delivered boost is then approached independently, vents rapidly on lift, and feeds the engine air-charge ratio. Exponential transitions remain stable across physics timesteps. A vehicle without turbo data remains naturally aspirated.
 	</description>
 	<tutorials>
 	</tutorials>
 	<members>
-		<member name="spool_up" type="float" setter="set_spool_up" getter="get_spool_up" default="2.0">
-			Turbo spool-up rate. Higher values make the turbo reach target boost faster under acceleration.
+		<member name="max_boost_bar" type="float" setter="set_max_boost_bar" getter="get_max_boost_bar" default="1.0">
+			Maximum delivered boost pressure above atmospheric pressure, in bar.
 		</member>
-		<member name="spool_down" type="float" setter="set_spool_down" getter="get_spool_down" default="1.0">
-			Turbo spool-down rate. Higher values make boost drop faster when lifting off the throttle.
+		<member name="full_boost_rpm" type="float" setter="set_full_boost_rpm" getter="get_full_boost_rpm" default="3000.0">
+			Engine speed in RPM at which the normalized RPM contribution to turbo shaft energy reaches 1.0.
 		</member>
-		<member name="max_boost" type="float" setter="set_max_boost" getter="get_max_boost" default="30.0">
-			Maximum boost pressure in psi above atmospheric.
-		</member>
-		<member name="start_rpm" type="float" setter="set_start_rpm" getter="get_start_rpm" default="1500.0">
-			Engine RPM at which the turbo starts building boost.
-		</member>
-		<member name="max_boost_rpm" type="float" setter="set_max_boost_rpm" getter="get_max_boost_rpm" default="4000.0">
-			Engine RPM at which maximum boost is reached.
-		</member>
-		<member name="fall_rpm" type="float" setter="set_fall_rpm" getter="get_fall_rpm" default="6000.0">
-			Engine RPM after which boost begins to taper off (if above max_boost_rpm).
+		<member name="lag_seconds" type="float" setter="set_lag_seconds" getter="get_lag_seconds" default="0.6">
+			Base exponential time constant, in seconds, for shaft-energy response; shaft decay on lift uses twice this lag.
 		</member>
 	</members>
 </class>

@@ -4,7 +4,7 @@
 		A resource that defines tire parameters for the tanh-based tire model.
 	</brief_description>
 	<description>
-		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), relaxation times for force smoothing, and the combined-grip exponent. Tire parameters are copied to each [Wheel] during running-gear setup.
+		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), relaxation times for force smoothing, combined-grip exponent, and self-aligning torque trail parameters. [Wheel] computes the internal SAT moment as [code]lateral_force * trail[/code]; because its applied world lateral force is [code]-right_tangent * lateral_force[/code], SAT opposes that applied force. Tire parameters are copied to each [Wheel] during running-gear setup.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -23,6 +23,12 @@
 		</member>
 		<member name="combined_grip_exponent" type="float" setter="set_combined_grip_exponent" getter="get_combined_grip_exponent" default="2.0">
 			Exponent [code]p[/code] for combining normalized longitudinal and lateral force. The value is clamped to [1, 16] (default 2). [code]p=2[/code] is the established friction ellipse; larger values progressively retain more simultaneous normalized longitudinal/lateral force before limiting. The configured value is copied to each [Wheel] during setup.
+		</member>
+		<member name="pneumatic_trail" type="float" setter="set_pneumatic_trail" getter="get_pneumatic_trail" default="0.02">
+			Pneumatic trail contribution to simplified self-aligning torque, in metres. Its influence rolls off quadratically with normalized absolute slip angle. Default: 0.02 m. This is a model parameter, not a physical caster-geometry calculation.
+		</member>
+		<member name="mechanical_trail" type="float" setter="set_mechanical_trail" getter="get_mechanical_trail" default="0.02">
+			Mechanical trail contribution to simplified self-aligning torque, in metres. Default: 0.02 m.
 		</member>
 		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.3">
 			Tire radius in meters.

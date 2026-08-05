@@ -109,17 +109,7 @@ void Axle::integrate(real_t dt) {
 }
 void Axle::solve_steering(real_t steer_input, real_t dt, real_t speed_kph) {
     real_t sat = get_total_sat();
-    real_t speed_factor = std::min(speed_kph / real_t{8.0}, real_t{1.0});
-    sat *= speed_factor;
-
-    real_t driver_blend = real_t{1.0} - std::abs(steer_input);
-    sat *= driver_blend;
-
-    // low pass
-    real_t alpha = std::min(dt * real_t{60.0}, real_t{1.0});
-    filtered_sat += (sat - filtered_sat) * alpha;
-
-    steering_rack.solve(steer_input, filtered_sat, dt, speed_kph);
+    steering_rack.solve(steer_input, sat, dt, speed_kph);
 }
 
 real_t Axle::get_steer_angle() const {

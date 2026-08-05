@@ -54,6 +54,12 @@ class TireData : public Resource {
     void set_combined_grip_exponent(real_t value);
     real_t get_combined_grip_exponent() const;
 
+    void set_pneumatic_trail(real_t value);
+    real_t get_pneumatic_trail() const;
+
+    void set_mechanical_trail(real_t value);
+    real_t get_mechanical_trail() const;
+
     real_t friction_forward = 1.0;
     real_t friction_lateral = 1.0;
     Ref<Curve> forward_friction_curve;
@@ -70,6 +76,9 @@ class TireData : public Resource {
     // p=2 is the traditional friction ellipse; larger values allow more
     // simultaneous force before limiting.
     real_t combined_grip_exponent = 2.0;
+    // Self-aligning torque trail components in metres.
+    real_t pneumatic_trail = 0.02;
+    real_t mechanical_trail = 0.02;
 };
 
 }

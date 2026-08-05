@@ -59,6 +59,18 @@ void TireData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_combined_grip_exponent"), &TireData::get_combined_grip_exponent);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "combined_grip_exponent", PROPERTY_HINT_RANGE, "1.0,16.0,0.1"),
                  "set_combined_grip_exponent", "get_combined_grip_exponent");
+
+    ClassDB::bind_method(D_METHOD("set_pneumatic_trail", "value"), &TireData::set_pneumatic_trail);
+    ClassDB::bind_method(D_METHOD("get_pneumatic_trail"), &TireData::get_pneumatic_trail);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pneumatic_trail", PROPERTY_HINT_RANGE,
+                               "0.0,0.2,0.001,metres"),
+                 "set_pneumatic_trail", "get_pneumatic_trail");
+
+    ClassDB::bind_method(D_METHOD("set_mechanical_trail", "value"), &TireData::set_mechanical_trail);
+    ClassDB::bind_method(D_METHOD("get_mechanical_trail"), &TireData::get_mechanical_trail);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mechanical_trail", PROPERTY_HINT_RANGE,
+                               "0.0,0.2,0.001,metres"),
+                 "set_mechanical_trail", "get_mechanical_trail");
 }
 
 void TireData::set_friction_forward(real_t value) { friction_forward = value; }
@@ -113,5 +125,11 @@ void TireData::set_combined_grip_exponent(real_t value) {
 }
 
 real_t TireData::get_combined_grip_exponent() const { return combined_grip_exponent; }
+
+void TireData::set_pneumatic_trail(real_t value) { pneumatic_trail = value; }
+real_t TireData::get_pneumatic_trail() const { return pneumatic_trail; }
+
+void TireData::set_mechanical_trail(real_t value) { mechanical_trail = value; }
+real_t TireData::get_mechanical_trail() const { return mechanical_trail; }
 
 }

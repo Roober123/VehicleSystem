@@ -85,7 +85,6 @@ public:
     real_t get_wheelbase() const { return wheelbase; }
 
 private:
-    real_t filtered_sat = 0.0;
     real_t trackwidth = 0.0;
     real_t wheelbase = 0.0;
 };

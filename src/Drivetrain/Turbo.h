@@ -1,19 +1,25 @@
 #pragma once
-#include "godot_cpp/classes/node3d.hpp"
+
 #include "Resources/turbo_data.h"
 
 class Turbo {
-    real_t spool_up = 1.5;
-    real_t spool_down = 2.5;
-    real_t max_boost = 1; 
+    // Shaft energy is normalized and always kept in [0, 1].  Boost is stored
+    // in bar and bounded by the configured maximum.
+    godot::real_t shaft_energy = godot::real_t{0.0};
+    godot::real_t boost_bar = godot::real_t{0.0};
+    godot::real_t max_boost_bar = godot::real_t{1.0};
+    godot::real_t full_boost_rpm = godot::real_t{3000.0};
+    godot::real_t lag_seconds = godot::real_t{0.6};
 
-    real_t boost = 0.0; // bar
+public:
+    void configure(const godot::Ref<godot::TurboData> &data);
 
-    real_t start_rpm = 2000;
-    real_t max_boost_rpm = 2800;
-    real_t fall_rpm = 6000;
-    public:
-    void configure(const godot::Ref<godot::TurboData>& data);
-    real_t update(real_t dt, real_t engine_rpm, real_t throttle);
-    real_t get_boost() { return boost; }
+    // normalized_base_torque is the once-sampled, normalized engine curve.
+    godot::real_t update(godot::real_t dt, godot::real_t engine_rpm,
+                         godot::real_t effective_throttle,
+                         godot::real_t normalized_base_torque = godot::real_t{1.0});
+
+    godot::real_t get_boost() const { return boost_bar; }
+    godot::real_t get_shaft_energy() const { return shaft_energy; }
+    godot::real_t get_air_charge_ratio() const;
 };

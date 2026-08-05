@@ -15,7 +15,6 @@ class VehicleEngine : public RotationalBody {
     real_t engine_braking = 0.5;
 
     bool rev_limit_cut = false;
-    real_t rev_limit_timer = 0.0;
     real_t effective_drive_torque = 0.0;
 
     Turbo* turbo = nullptr;

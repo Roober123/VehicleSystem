@@ -113,3 +113,7 @@ neutral torque and slip are zero and `slipping == false`.
 `VehicleEngine` samples effective drive torque once per substep and reuses it
 for application and telemetry. The network solve receives `dt`, signed ratio,
 clutch engagement, and clutch capacity as direct arguments.
+The engine rev limiter cuts combustion torque at redline and resumes 150 RPM
+below it. This hysteresis replaces the former fixed-duration cut, while driver
+throttle remains available to the turbo so limiter activity does not behave
+like throttle lift. A 110% redline ceiling remains only as an emergency bound.

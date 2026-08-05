@@ -5,6 +5,35 @@ one simulated driveshaft, and up to eight driven two-wheel axles. `configure`
 copies the validated axle program and builds one fixed primary constraint; solving
 does not discover topology or allocate.
 
+## Optional turbo
+
+`VehicleDrivetrain` owns one `Turbo` value, and a valid `VehicleConfig.turbo_data`
+resource enables it on the engine. With no turbo resource, the engine keeps its
+naturally aspirated air-charge ratio of `1.0`. `TurboData` exposes only
+`max_boost_bar` (bar above atmospheric, default `1.0`), `full_boost_rpm` (RPM,
+default `3000`), and `lag_seconds` (seconds, default `0.6`); response constants
+remain internal to the runtime. Values are authored within their Inspector
+ranges and supplied through a valid resource/configuration. `Turbo::update`
+assumes a positive physics timestep (`dt > 0`) from its caller; these are
+boundary invariants. Configuration copies the three authored values directly.
+
+For a valid authored configuration, the runtime maintains two bounded states:
+normalized shaft energy in `[0, 1]` and delivered boost in bar. Each substep
+computes a normalized exhaust target from effective throttle, normalized
+base-engine torque, and
+`clamp(engine_rpm / full_boost_rpm, 0, 1)`. Base-engine load shapes spool below
+the full-boost point, with its influence fading as the RPM ratio approaches one.
+Consequently, sustained full throttle at `full_boost_rpm` targets normalized
+shaft energy `1.0` and `max_boost_bar`, regardless of torque-curve shape. Shaft
+energy approaches that target exponentially using `lag_seconds`; on lift, its
+decay time is doubled so stored
+energy persists briefly. The compressor target is
+`max_boost_bar * shaft_energy^2`, while delivered boost is approached separately
+with internal rise and rapid-vent time constants. Closing the throttle therefore
+vents boost much faster than shaft energy decays. The engine converts the
+bounded boost to air charge with `1.0 + 0.85 * boost_bar`, and reuses the sampled
+base torque for the same substep.
+
 ## Bodies and constraints
 
 Each `RotationalBody` owns angular velocity, inertia, pending torque, and

@@ -1,8 +1,10 @@
 #include "drivetrain_regression.h"
 
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
 
 #include "godot_cpp/classes/curve.hpp"
@@ -16,15 +18,18 @@
 #include "Drivetrain/RotationalConstraint.h"
 #include "Drivetrain/RotationalNetwork.h"
 #include "Drivetrain/Gearbox.h"
+#include "Drivetrain/Turbo.h"
 #include "Drivetrain/VehicleEngine.h"
 #include "Resources/gearbox_data.h"
 #include "Resources/differential_data.h"
 #include "Resources/suspension_data.h"
 #include "Resources/tire_data.h"
+#include "Resources/turbo_data.h"
 #include "Resources/vehicle_aerodynamics_data.h"
 #include "Resources/vehicle_config.h"
 #include "Resources/vehicle_engine_data.h"
 #include "axle.h"
+#include "SteeringRack.h"
 #include "vehicle.h"
 #include "vehicle_setup_validation.h"
 #include "wheel.h"
@@ -71,6 +76,16 @@ Ref<VehicleEngineData> make_engine_data() {
     data->set_max_torque(real_t{100.0});
     data->set_engine_drag(real_t{0.5});
     data->set_engine_braking(real_t{0.2});
+    return data;
+}
+
+Ref<TurboData> make_turbo_data(real_t max_boost_bar = real_t{1.0},
+                               real_t full_boost_rpm = real_t{3000.0},
+                               real_t lag_seconds = real_t{0.6}) {
+    Ref<TurboData> data = memnew(TurboData);
+    data->set_max_boost_bar(max_boost_bar);
+    data->set_full_boost_rpm(full_boost_rpm);
+    data->set_lag_seconds(lag_seconds);
     return data;
 }
 
@@ -910,6 +925,143 @@ void test_gearbox(TestState &state) {
     state.expect(automatic.is_shifting(), "Gearbox automatic upshift threshold");
 }
 
+void test_turbo(TestState &state) {
+    // TurboData intentionally exposes exactly three authoring values.
+    Ref<TurboData> defaults = memnew(TurboData);
+    state.expect(near(defaults->get_max_boost_bar(), real_t{1.0}) &&
+                         near(defaults->get_full_boost_rpm(), real_t{3000.0}) &&
+                         near(defaults->get_lag_seconds(), real_t{0.6}),
+                 "TurboData has three stable property defaults");
+
+    defaults->set_max_boost_bar(real_t{2.0});
+    defaults->set_full_boost_rpm(real_t{3500.0});
+    defaults->set_lag_seconds(real_t{0.75});
+    state.expect(near(defaults->get_max_boost_bar(), real_t{2.0}) &&
+                         near(defaults->get_full_boost_rpm(), real_t{3500.0}) &&
+                         near(defaults->get_lag_seconds(), real_t{0.75}),
+                 "TurboData setters round-trip authored values");
+
+    Ref<TurboData> configuration = make_turbo_data(real_t{2.0}, real_t{3000.0},
+                                                    real_t{0.6});
+    Turbo zero_rpm;
+    Turbo full_rpm;
+    zero_rpm.configure(configuration);
+    full_rpm.configure(configuration);
+    zero_rpm.update(real_t{0.1}, real_t{0.0}, real_t{1.0}, real_t{1.0});
+    full_rpm.update(real_t{0.1}, real_t{3000.0}, real_t{1.0}, real_t{1.0});
+    state.expect(full_rpm.get_shaft_energy() > zero_rpm.get_shaft_energy() +
+                         real_t{0.05} &&
+                         full_rpm.get_boost() > zero_rpm.get_boost(),
+                 "Turbo spool responds to engine RPM load");
+
+    Turbo low_load;
+    Turbo high_load;
+    low_load.configure(configuration);
+    high_load.configure(configuration);
+    for (int i = 0; i < 5; ++i) {
+        low_load.update(real_t{0.1}, real_t{1500.0}, real_t{1.0}, real_t{0.2});
+        high_load.update(real_t{0.1}, real_t{1500.0}, real_t{1.0}, real_t{1.0});
+    }
+    state.expect(high_load.get_shaft_energy() > low_load.get_shaft_energy() +
+                         real_t{0.05},
+                 "Turbo spool below full-boost RPM responds to normalized engine load");
+
+    Turbo authored_full_boost;
+    authored_full_boost.configure(configuration);
+    for (int i = 0; i < 400; ++i)
+        authored_full_boost.update(real_t{0.02}, real_t{3000.0},
+                                   real_t{1.0}, real_t{0.2});
+    state.expect(near(authored_full_boost.get_shaft_energy(), real_t{1.0},
+                      real_t{1e-4}) &&
+                         near(authored_full_boost.get_boost(),
+                              configuration->get_max_boost_bar(), real_t{1e-4}),
+                 "Turbo reaches configured maximum at full-boost RPM");
+
+    Turbo bounded;
+    bounded.configure(configuration);
+    for (int i = 0; i < 400; ++i)
+        bounded.update(real_t{0.1}, real_t{3000.0}, real_t{1.0}, real_t{1.0});
+    state.expect(bounded.get_shaft_energy() >= real_t{0.0} &&
+                         bounded.get_shaft_energy() <= real_t{1.0} &&
+                         bounded.get_boost() >= real_t{0.0} &&
+                         bounded.get_boost() <= configuration->get_max_boost_bar(),
+                 "Turbo shaft and boost remain bounded under full load");
+    state.expect(near(bounded.get_air_charge_ratio(),
+                      real_t{1.0} + real_t{0.85} * bounded.get_boost(),
+                      real_t{1e-5}),
+                 "Turbo air-charge ratio follows bounded boost");
+
+    Turbo venting;
+    venting.configure(configuration);
+    for (int i = 0; i < 200; ++i)
+        venting.update(real_t{0.02}, real_t{3000.0}, real_t{1.0}, real_t{1.0});
+    const real_t shaft_before_lift = venting.get_shaft_energy();
+    const real_t boost_before_lift = venting.get_boost();
+    venting.update(real_t{0.1}, real_t{3000.0}, real_t{0.0}, real_t{1.0});
+    const real_t shaft_after_lift = venting.get_shaft_energy();
+    const real_t boost_after_lift = venting.get_boost();
+    const real_t shaft_drop = (shaft_before_lift - shaft_after_lift) /
+                              shaft_before_lift;
+    const real_t boost_drop = (boost_before_lift - boost_after_lift) /
+                              boost_before_lift;
+    state.expect(boost_before_lift > real_t{0.5} && shaft_before_lift > real_t{0.5} &&
+                         boost_after_lift < boost_before_lift * real_t{0.3} &&
+                         shaft_after_lift > shaft_before_lift * real_t{0.7} &&
+                         boost_drop > shaft_drop + real_t{0.5},
+                 "Turbo boost vents much faster than retained shaft energy on lift");
+
+    Turbo fresh;
+    fresh.configure(configuration);
+    const real_t fresh_boost = fresh.update(real_t{0.01}, real_t{3000.0},
+                                            real_t{1.0}, real_t{1.0});
+    const real_t retained_boost = venting.update(real_t{0.01}, real_t{3000.0},
+                                                 real_t{1.0}, real_t{1.0});
+    state.expect(venting.get_shaft_energy() > fresh.get_shaft_energy() &&
+                         retained_boost > fresh_boost + real_t{0.05},
+                 "Turbo retained shaft improves immediate reapplication");
+
+    const auto simulate = [&](real_t dt, int steps) {
+        Turbo candidate;
+        candidate.configure(configuration);
+        for (int i = 0; i < steps; ++i)
+            candidate.update(dt, real_t{3000.0}, real_t{1.0}, real_t{1.0});
+        return std::pair<real_t, real_t>(candidate.get_shaft_energy(),
+                                         candidate.get_boost());
+    };
+    const auto fine_step = simulate(real_t{0.01}, 100);
+    const auto common_step = simulate(real_t{0.02}, 50);
+    state.expect(std::abs(fine_step.first - common_step.first) < real_t{0.01} &&
+                         std::abs(fine_step.second - common_step.second) < real_t{0.03},
+                 "Turbo response is timestep-consistent at 10 ms and 20 ms");
+
+    Turbo engine_turbo;
+    engine_turbo.configure(make_turbo_data(real_t{1.0}, real_t{3000.0}, real_t{0.6}));
+    VehicleEngine boosted_engine(make_engine_data());
+    boosted_engine.set_turbo(&engine_turbo);
+    boosted_engine.set_angular_velocity(rpm_to_omega(real_t{3000.0}));
+    boosted_engine.throttle = real_t{1.0};
+    for (int i = 0; i < 100; ++i) {
+        boosted_engine.clear_torque();
+        boosted_engine.accumulate_torque(real_t{0.02});
+    }
+    const real_t expected_boosted_torque = real_t{100.0} *
+                                            engine_turbo.get_air_charge_ratio();
+    state.expect(engine_turbo.get_boost() > real_t{0.0} &&
+                         near(boosted_engine.get_torque(), expected_boosted_torque,
+                              real_t{1e-4}) &&
+                         boosted_engine.get_torque() > real_t{100.0},
+                 "VehicleEngine integrates turbo air charge into boosted torque");
+
+    VehicleEngine naturally_aspirated(make_engine_data());
+    naturally_aspirated.set_angular_velocity(rpm_to_omega(real_t{3000.0}));
+    naturally_aspirated.throttle = real_t{1.0};
+    naturally_aspirated.accumulate_torque(real_t{0.02});
+    state.expect(near(naturally_aspirated.get_turbo_boost(), real_t{0.0}) &&
+                         near(naturally_aspirated.get_torque(), real_t{100.0}) &&
+                         near(naturally_aspirated.get_pending_torque(), real_t{100.0}),
+                 "VehicleEngine naturally aspirated path remains baseline");
+}
+
 void test_engine(TestState &state) {
     VehicleEngine engine(make_engine_data());
     engine.set_angular_velocity(rpm_to_omega(real_t{700.0}));
@@ -937,14 +1089,44 @@ void test_engine(TestState &state) {
     state.expect(engine.get_angular_velocity() < before_braking, "VehicleEngine drag/braking slows engine");
 
     engine.clear_torque();
-    engine.set_angular_velocity(rpm_to_omega(real_t{5000.0}));
+    engine.set_angular_velocity(rpm_to_omega(real_t{4000.0}));
     engine.throttle = real_t{1.0};
-    engine.integrate(real_t{0.001});
     engine.accumulate_torque(real_t{0.01});
-    state.expect(engine.get_rpm() <= real_t{4200.0} + real_t{1.0},
-                 "VehicleEngine rev limit hard bound");
     state.expect(engine.get_pending_torque() <= real_t{0.0},
-                 "VehicleEngine rev limit cuts throttle torque");
+                 "VehicleEngine rev limiter cuts torque at redline");
+
+    engine.clear_torque();
+    engine.set_angular_velocity(rpm_to_omega(real_t{3900.0}));
+    engine.accumulate_torque(real_t{0.01});
+    state.expect(engine.get_pending_torque() <= real_t{0.0},
+                 "VehicleEngine rev limiter remains cut inside RPM hysteresis");
+
+    engine.clear_torque();
+    engine.set_angular_velocity(rpm_to_omega(real_t{3850.0}));
+    engine.accumulate_torque(real_t{0.01});
+    state.expect(engine.get_pending_torque() > real_t{0.0} &&
+                         near(engine.get_torque(), real_t{100.0}),
+                 "VehicleEngine rev limiter resumes below RPM hysteresis");
+
+    engine.clear_torque();
+    engine.set_angular_velocity(rpm_to_omega(real_t{5000.0}));
+    engine.integrate(real_t{0.001});
+    state.expect(engine.get_rpm() <= real_t{4400.0} + real_t{1.0},
+                 "VehicleEngine emergency RPM ceiling remains bounded");
+
+    Turbo limiter_turbo;
+    limiter_turbo.configure(make_turbo_data());
+    VehicleEngine turbo_limited(make_engine_data());
+    turbo_limited.set_turbo(&limiter_turbo);
+    turbo_limited.set_angular_velocity(rpm_to_omega(real_t{4000.0}));
+    turbo_limited.throttle = real_t{1.0};
+    for (int i = 0; i < 100; ++i) {
+        turbo_limited.clear_torque();
+        turbo_limited.accumulate_torque(real_t{0.02});
+    }
+    state.expect(near(turbo_limited.get_torque(), real_t{0.0}) &&
+                         turbo_limited.get_turbo_boost() > real_t{0.5},
+                 "VehicleEngine limiter cut preserves open-throttle turbo boost");
 }
 
 void test_tire_combined_grip(TestState &state) {
@@ -995,6 +1177,101 @@ void test_tire_combined_grip(TestState &state) {
                      std::abs(p4_force.z) > std::abs(p2_force.z),
                  "Wheel combined-grip p>2 retains more simultaneous force and copies exponent");
     memdelete(p4_wheel);
+}
+
+void test_steering_sat(TestState &state) {
+    Ref<TireData> tire = make_tire_data();
+    tire->set_forward_friction_curve(Ref<Curve>());
+    tire->set_lateral_friction_curve(Ref<Curve>());
+    tire->set_friction_forward(real_t{1.0});
+    tire->set_friction_lateral(real_t{1.0});
+    tire->set_load_sensitivity(real_t{0.0});
+    tire->set_peak_slip_angle(real_t{10.0});
+    // Keep relaxation slower than the test step so SAT must consume the
+    // final relaxed lateral force rather than the raw tire force.
+    tire->set_relaxation_low(real_t{1.0});
+    tire->set_relaxation_high(real_t{1.0});
+    tire->set_pneumatic_trail(real_t{0.06});
+    tire->set_mechanical_trail(real_t{0.01});
+
+    Wheel *wheel = make_combined_grip_wheel(tire);
+    Wheel *negative_wheel = make_combined_grip_wheel(tire);
+    const auto solve_at_slip = [&](Wheel *target_wheel, real_t slip_angle_degrees) {
+        const real_t slip_angle_radians = slip_angle_degrees * kPi / real_t{180.0};
+        target_wheel->tire_force = Vector3();
+        target_wheel->solve_tire(Vector3(),
+                                 Vector3(std::tan(slip_angle_radians) * real_t{2.5}, 0.0, 0.0),
+                                 Vector3(), real_t{0.1}, real_t{0.0}, false);
+        // Wheel's point-force convention applies -right_tangent*lateral_force;
+        // this world-space force is the value used by the Mz sign equation.
+        const real_t final_lateral_force = target_wheel->tire_force.x;
+        const real_t normalized_slip = std::clamp(
+            std::abs(target_wheel->slip_angle) / tire->get_peak_slip_angle(),
+            real_t{0.0}, real_t{1.0});
+        const real_t expected_trail = tire->get_mechanical_trail() +
+                                      tire->get_pneumatic_trail() *
+                                          (real_t{1.0} - normalized_slip) *
+                                          (real_t{1.0} - normalized_slip);
+        return std::pair<real_t, real_t>(
+            target_wheel->self_aligning_torque, -final_lateral_force * expected_trail);
+    };
+
+    const auto low_slip = solve_at_slip(wheel, real_t{2.0});
+    const auto mid_slip = solve_at_slip(wheel, real_t{5.0});
+    const auto high_slip = solve_at_slip(wheel, real_t{20.0});
+    const auto negative_high_slip = solve_at_slip(negative_wheel, real_t{-20.0});
+    state.expect(near(low_slip.first, low_slip.second, real_t{2e-4}) &&
+                     near(mid_slip.first, mid_slip.second, real_t{2e-4}) &&
+                     near(high_slip.first, high_slip.second, real_t{2e-4}),
+                 "Wheel SAT follows final lateral force and quadratic pneumatic-trail rolloff");
+    state.expect(near(negative_high_slip.first, negative_high_slip.second, real_t{2e-4}),
+                 "Wheel SAT sign equation also holds for negative slip");
+    state.expect(std::abs(high_slip.first) > real_t{0.0},
+                 "Wheel SAT retains residual mechanical trail at and beyond peak slip");
+    state.expect(high_slip.first * wheel->tire_force.x < real_t{0.0},
+                 "Wheel SAT opposes positive world lateral force toward center");
+    state.expect(negative_high_slip.first * negative_wheel->tire_force.x < real_t{0.0},
+                 "Wheel SAT opposes negative world lateral force toward center");
+
+    memdelete(wheel);
+    memdelete(negative_wheel);
+
+    Ref<SteeringRackData> rack_data = memnew(SteeringRackData);
+    rack_data->set_inertia(real_t{1.0});
+    rack_data->set_damping(real_t{0.0});
+    rack_data->set_friction_coefficient(real_t{0.0});
+    rack_data->set_max_angle(real_t{30.0});
+    rack_data->set_proportional_gain(real_t{100.0});
+    rack_data->set_derivative_gain(real_t{0.0});
+    rack_data->set_sat_gain(real_t{1.0});
+
+    SteeringRack positive_rack;
+    positive_rack.load(rack_data);
+    positive_rack.solve(real_t{1.0}, real_t{-100000.0}, real_t{0.01}, real_t{0.0});
+    state.expect(near(positive_rack.get_angle(), real_t{0.0}),
+                 "Opposing SAT caps at positive player/PD authority");
+
+    SteeringRack negative_rack;
+    negative_rack.load(rack_data);
+    negative_rack.solve(real_t{-1.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
+    state.expect(near(negative_rack.get_angle(), real_t{0.0}),
+                 "Opposing SAT caps at negative player/PD authority");
+
+    SteeringRack neutral_rack;
+    neutral_rack.load(rack_data);
+    neutral_rack.solve(real_t{1.0}, real_t{0.0}, real_t{0.01}, real_t{0.0});
+
+    SteeringRack assisting_rack;
+    assisting_rack.load(rack_data);
+    assisting_rack.solve(real_t{1.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
+    state.expect(near(assisting_rack.get_angle(), kPi / real_t{6.0}),
+                 "Assisting SAT remains unrestricted up to rack travel limit");
+
+    SteeringRack zero_pd_rack;
+    zero_pd_rack.load(rack_data);
+    zero_pd_rack.solve(real_t{0.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
+    state.expect(near(zero_pd_rack.get_angle(), real_t{0.0}),
+                 "SAT cannot initiate rack motion without player/PD torque");
 }
 
 void test_vehicle_center_of_mass_marker(TestState &state) {
@@ -1197,8 +1474,10 @@ bool DrivetrainRegression::run() {
     test_rotational_constraint(state);
     test_rotational_network(state);
     test_gearbox(state);
+    test_turbo(state);
     test_engine(state);
     test_tire_combined_grip(state);
+    test_steering_sat(state);
     test_vehicle_center_of_mass_marker(state);
     test_setup_validation(state);
     if (state.failures != 0)

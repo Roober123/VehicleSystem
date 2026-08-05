@@ -32,6 +32,8 @@ class Wheel : public Node3D {
 
     // tanh tire model parameters
     real_t peak_slip_angle = 10.0;     // degrees
+    real_t pneumatic_trail = 0.02;     // metres
+    real_t mechanical_trail = 0.02;    // metres
     real_t relaxation_low = 0.042;     // seconds at 0 m/s
     real_t relaxation_high = 0.01;     // seconds at 30+ m/s
 
