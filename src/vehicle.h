@@ -4,6 +4,7 @@
 
 #include "godot_cpp/classes/physics_direct_body_state3d.hpp"
 #include "godot_cpp/classes/rigid_body3d.hpp"
+#include "godot_cpp/classes/marker3d.hpp"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/property_info.hpp>
 
@@ -38,6 +39,7 @@ class Vehicle : public RigidBody3D {
     VehicleRunningGear running_gear;
     VehicleDrivetrain drivetrain;
     Ref<VehicleConfig> config = nullptr;
+    Marker3D *center_of_mass_marker = nullptr;
 
     real_t throttle_input = 0.0;
     real_t steer_input = 0.0;
@@ -59,6 +61,9 @@ public:
 
     void set_config(const Ref<VehicleConfig> &value);
     Ref<VehicleConfig> get_config() const { return config; }
+
+    void set_center_of_mass_marker(Marker3D *value) { center_of_mass_marker = value; }
+    Marker3D *get_center_of_mass_marker() const { return center_of_mass_marker; }
 
     void set_throttle_input(real_t value);
     real_t get_throttle_input() const { return throttle_input; }

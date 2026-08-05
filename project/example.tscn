@@ -27,8 +27,9 @@ point_count = 4
 
 [sub_resource type="VehicleEngineData" id="VehicleEngineData_l7kk7"]
 torque_curve = SubResource("Curve_n51mc")
+redline_rpm = 7000.0
 inertia = 0.6
-max_torque = 706.0
+max_torque = 650.0
 engine_braking = 0.3
 
 [sub_resource type="GearboxData" id="GearboxData_c52e2"]
@@ -39,7 +40,7 @@ auto_mode = false
 
 [sub_resource type="SuspensionData" id="SuspensionData_yivbd"]
 suspension_length = 0.5
-damping_ratio = 0.75
+damping_ratio = 1.0
 antiroll_bar_stiffness = 4000.0
 
 [sub_resource type="VehicleConfig" id="VehicleConfig_example"]
@@ -59,11 +60,15 @@ _data = [Vector2(0, 0), 0.0, 0.10468469, 0, 0, Vector2(1.0043104, 0.9916319), 0.
 point_count = 3
 
 [sub_resource type="TireData" id="TireData_8lvy3"]
+friction_lateral = 1.15
 forward_friction_curve = SubResource("Curve_ei00m")
 lateral_friction_curve = SubResource("Curve_ugfer")
 brake_power = 600.0
+peak_slip_angle = 12.0
 relaxation_low = 0.06
 tire_width = 0.3
+load_sensitivity = 0.07
+combined_grip_exponent = 4.0
 
 [sub_resource type="DifferentialData" id="DifferentialData_8lvy3"]
 
@@ -78,19 +83,23 @@ bottom_radius = 0.3
 height = 0.3
 
 [sub_resource type="TireData" id="TireData_n51mc"]
-friction_lateral = 1.05
+friction_lateral = 1.15
 forward_friction_curve = SubResource("Curve_ei00m")
 lateral_friction_curve = SubResource("Curve_ugfer")
 brake_power = 600.0
+peak_slip_angle = 12.0
 relaxation_low = 0.06
 tire_width = 0.3
+load_sensitivity = 0.07
+combined_grip_exponent = 4.0
 
 [sub_resource type="DifferentialData" id="DifferentialData_example"]
 mode = 1
-preload_torque = 16.0
-power_lock_ratio = 0.2
-slip_sensitive_gain = 1.5
-max_lock_torque = 350.0
+preload_torque = 8.0
+power_lock_ratio = 0.12
+coast_lock_ratio = 0.1
+slip_sensitive_gain = 0.3
+max_lock_torque = 180.0
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_n51mc"]
 points = PackedVector3Array(0.35711777, -1.6260327, -0.095265254, 0.63115805, 1.2770655, 0.043835126, -0.34930095, -0.243471, 0.51860654, 0.65855765, -0.53153664, 0.3265988, -0.5412805, -1.6356881, 0.086747654, -0.63296324, 1.1836125, 0.2695963, 0.65855765, 1.1478441, -0.15317395, 0.51453894, 1.2918769, 0.3265988, -0.6852992, 1.1478441, -0.15317395, -0.63720214, -1.2514001, -0.20122874, 0.51453894, -1.6356881, 0.086747654, 0.5468513, -1.3058677, -0.16298498, 0.37065646, -0.243471, 0.51860654, -0.63720214, -0.48342547, 0.3265988, -0.49318343, 1.2918769, 0.3265988, 0.2876219, 0.4486514, 0.47828797, -0.47456065, 1.3313303, -0.0030150143, -0.061263487, -1.2995113, 0.23063016, -0.6852992, 0.47609174, 0.27861446, -0.14168216, -1.5419468, -0.16798855, 0.6179928, 1.2017332, 0.27110574, 0.6012554, -0.4098893, -0.16939557, -0.30790272, 0.44664946, 0.47721535, 0.4501997, 1.3329196, -0.003188758, -0.33654687, -1.6293805, -0.09584041, 0.3225594, -1.6837993, 0.086747654, 0.6574781, 1.190148, 0.13642474, 0.4665781, -1.3957336, 0.18264583, -0.49318343, -1.3957336, 0.18264583, 0.42270547, -1.4925091, -0.16659282, -0.5892413, -1.2514001, 0.18264583, -0.34930095, -1.6837993, 0.086747654)
@@ -539,13 +548,13 @@ environment = SubResource("Environment_8lvy3")
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
 shadow_enabled = true
 
-[node name="Vehicle" type="Vehicle" parent="." unique_id=357085417]
+[node name="Vehicle" type="Vehicle" parent="." unique_id=357085417 node_paths=PackedStringArray("center_of_mass_marker")]
 config = SubResource("VehicleConfig_example")
-substeps = 8
+center_of_mass_marker = NodePath("Marker3D")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6853267, 1.5508447)
 mass = 1500.0
 center_of_mass_mode = 1
-center_of_mass = Vector3(0, -0.05, 0.2)
+center_of_mass = Vector3(0, -0.05, -0.02)
 linear_damp_mode = 1
 angular_damp_mode = 1
 script = ExtResource("2_8lvy3")
@@ -633,6 +642,9 @@ skeleton = NodePath("")
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_pupds")
 skeleton = NodePath("")
+
+[node name="Marker3D" type="Marker3D" parent="Vehicle" unique_id=427608312]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06605971, -0.0971117)
 
 [node name="ChaseCamera" type="Camera3D" parent="." unique_id=291821691 node_paths=PackedStringArray("target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)

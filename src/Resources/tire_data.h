@@ -51,6 +51,9 @@ class TireData : public Resource {
     void set_load_sensitivity(real_t value);
     real_t get_load_sensitivity() const;
 
+    void set_combined_grip_exponent(real_t value);
+    real_t get_combined_grip_exponent() const;
+
     real_t friction_forward = 1.0;
     real_t friction_lateral = 1.0;
     Ref<Curve> forward_friction_curve;
@@ -63,6 +66,10 @@ class TireData : public Resource {
     real_t relaxation_high = 0.01;    // seconds at 30+ m/s
     real_t tire_width = 0.25;         // meters 
     real_t load_sensitivity = 0.10;   // friction loss exponent as vertical load increases
+    // Exponent of the normalized longitudinal/lateral force superellipse.
+    // p=2 is the traditional friction ellipse; larger values allow more
+    // simultaneous force before limiting.
+    real_t combined_grip_exponent = 2.0;
 };
 
 }

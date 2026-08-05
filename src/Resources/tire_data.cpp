@@ -1,5 +1,6 @@
 #include "tire_data.h"
 #include <algorithm>
+#include <cmath>
 
 namespace godot {
 
@@ -53,6 +54,11 @@ void TireData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_load_sensitivity", "value"), &TireData::set_load_sensitivity);
     ClassDB::bind_method(D_METHOD("get_load_sensitivity"), &TireData::get_load_sensitivity);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "load_sensitivity", PROPERTY_HINT_RANGE, "0.0,0.3,0.01"), "set_load_sensitivity", "get_load_sensitivity");
+
+    ClassDB::bind_method(D_METHOD("set_combined_grip_exponent", "value"), &TireData::set_combined_grip_exponent);
+    ClassDB::bind_method(D_METHOD("get_combined_grip_exponent"), &TireData::get_combined_grip_exponent);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "combined_grip_exponent", PROPERTY_HINT_RANGE, "1.0,16.0,0.1"),
+                 "set_combined_grip_exponent", "get_combined_grip_exponent");
 }
 
 void TireData::set_friction_forward(real_t value) { friction_forward = value; }
@@ -90,5 +96,22 @@ real_t TireData::get_tire_width() { return tire_width; }
 
 void TireData::set_load_sensitivity(real_t value) { load_sensitivity = std::clamp(value, real_t{0.0}, real_t{0.3}); }
 real_t TireData::get_load_sensitivity() const { return load_sensitivity; }
+
+void TireData::set_combined_grip_exponent(real_t value) {
+    constexpr real_t default_exponent = real_t{2.0};
+    constexpr real_t min_exponent = real_t{1.0};
+    constexpr real_t max_exponent = real_t{16.0};
+
+    // NaN cannot be clamped reliably and infinities would leak into the
+    // runtime power calculation.  Reset invalid input to the documented
+    // default, while finite values remain bounded for stable simulation.
+    if (!std::isfinite(static_cast<double>(value))) {
+        combined_grip_exponent = default_exponent;
+        return;
+    }
+    combined_grip_exponent = std::clamp(value, min_exponent, max_exponent);
+}
+
+real_t TireData::get_combined_grip_exponent() const { return combined_grip_exponent; }
 
 }

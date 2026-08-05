@@ -28,6 +28,7 @@ class Wheel : public Node3D {
     real_t brake_power = 1500.0;
     real_t reference_load = 1.0;
     real_t load_sensitivity = 0.10;
+    real_t combined_grip_exponent = 2.0;
 
     // tanh tire model parameters
     real_t peak_slip_angle = 10.0;     // degrees
@@ -60,7 +61,7 @@ class Wheel : public Node3D {
                              real_t& raw_fwd_force, real_t& raw_lat_force,
                              real_t& fwd_mu, real_t& lat_mu) const;
 
-    // Elliptic friction circle limiting
+    // Lp superellipse limiting (p=2 is the established friction ellipse)
     real_t _combine_forces(real_t raw_fwd, real_t raw_lat, real_t normal,
                            real_t fwd_mu, real_t lat_mu,
                            real_t& out_fwd, real_t& out_lat) const;

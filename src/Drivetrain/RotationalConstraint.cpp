@@ -91,8 +91,7 @@ bool ConstraintSolver::merge_impulse(RotationalBody *body, real_t impulse) {
 	return true;
 }
 
-bool ConstraintSolver::insert_constraint(
-		const VelocityConstraint &constraint, real_t impulse) {
+bool ConstraintSolver::insert_constraint(const VelocityConstraint &constraint, real_t impulse) {
 	if (!std::isfinite(impulse))
 		return false;
 	// Build into a copy so a malformed later term cannot leave this solver
@@ -116,7 +115,7 @@ real_t ConstraintSolver::pending_impulse(const RotationalBody *body) const {
 
 real_t ConstraintSolver::predict_velocity(const RotationalBody *body) const {
 	if (body == nullptr)
-		return std::numeric_limits<real_t>::quiet_NaN();
+		return 0.0;
 	return body->predict_angular_velocity(dt) +
 			pending_impulse(body) / body->get_inertia();
 }
@@ -146,8 +145,7 @@ bool VelocityConstraint::add_term(RotationalBody *body, real_t coefficient) {
 }
 
 // Project one scalar velocity error, clamp its impulse, and retain the update.
-ConstraintSolution ConstraintSolver::solve(
-		const VelocityConstraint &constraint, real_t capacity_torque) {
+ConstraintSolution ConstraintSolver::solve(const VelocityConstraint &constraint, real_t capacity_torque) {
 	ConstraintSolution result;
 	if (!valid_dt || !valid_capacity(capacity_torque))
 		return result;
@@ -173,7 +171,8 @@ ConstraintSolution ConstraintSolver::solve(
 ClutchSolution ConstraintSolver::solve_clutch(
 		const VelocityConstraint &primary_constraint,
 		const VelocityConstraint &clutch_constraint,
-		real_t clutch_capacity_torque) {
+		real_t clutch_capacity_torque) 
+{
 	ClutchSolution result;
 	if (!valid_dt || !valid_capacity(clutch_capacity_torque))
 		return result;
@@ -189,10 +188,8 @@ ClutchSolution ConstraintSolver::solve_clutch(
 	real_t primary_mass = real_t{0.0};
 	real_t clutch_residual = real_t{0.0};
 	real_t clutch_mass = real_t{0.0};
-	if (!constraint_values(primary_constraint, *this, primary_residual,
-			primary_mass) ||
-			!constraint_values(clutch_constraint, *this, clutch_residual,
-			clutch_mass))
+	if (!constraint_values(primary_constraint, *this, primary_residual,primary_mass) ||
+		!constraint_values(clutch_constraint, *this, clutch_residual, clutch_mass))
 		return result;
 	const real_t cross_mass = cross_inverse_mass(
 			primary_constraint, clutch_constraint);

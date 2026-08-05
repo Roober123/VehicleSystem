@@ -17,6 +17,14 @@ void Vehicle::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "config", PROPERTY_HINT_RESOURCE_TYPE, "VehicleConfig"),
                  "set_config", "get_config");
 
+    ClassDB::bind_method(D_METHOD("set_center_of_mass_marker", "marker"),
+                         &Vehicle::set_center_of_mass_marker);
+    ClassDB::bind_method(D_METHOD("get_center_of_mass_marker"),
+                         &Vehicle::get_center_of_mass_marker);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "center_of_mass_marker",
+                              PROPERTY_HINT_NODE_TYPE, "Marker3D"),
+                 "set_center_of_mass_marker", "get_center_of_mass_marker");
+
     ClassDB::bind_method(D_METHOD("set_throttle_input", "value"), &Vehicle::set_throttle_input);
     ClassDB::bind_method(D_METHOD("get_throttle_input"), &Vehicle::get_throttle_input);
 
@@ -77,6 +85,15 @@ void Vehicle::_ready() {
     set_angular_damp_mode(DampMode::DAMP_MODE_REPLACE);
     set_linear_damp(0.0);
     set_angular_damp(0.0);
+
+    if (center_of_mass_marker != nullptr) {
+        const Vector3 marker_global_position =
+                center_of_mass_marker->get_global_position();
+        const Vector3 marker_local_position =
+                get_global_transform().affine_inverse().xform(marker_global_position);
+        set_center_of_mass_mode(RigidBody3D::CENTER_OF_MASS_MODE_CUSTOM);
+        set_center_of_mass(marker_local_position);
+    }
 
     running_gear.setup(setup_axles, get_mass(), config->get_suspension_data(),
                        config->get_aero_data());

@@ -6,6 +6,9 @@
 #include <vector>
 
 #include "godot_cpp/classes/curve.hpp"
+#include "godot_cpp/classes/engine.hpp"
+#include "godot_cpp/classes/scene_tree.hpp"
+#include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
@@ -22,8 +25,10 @@
 #include "Resources/vehicle_config.h"
 #include "Resources/vehicle_engine_data.h"
 #include "axle.h"
+#include "vehicle.h"
 #include "vehicle_setup_validation.h"
 #include "wheel.h"
+#include "godot_cpp/classes/marker3d.hpp"
 
 namespace godot {
 namespace {
@@ -78,6 +83,30 @@ Ref<TireData> make_tire_data(real_t radius = real_t{0.3}) {
     return data;
 }
 
+Ref<TireData> make_grip_tire(real_t exponent) {
+    Ref<TireData> data = make_tire_data();
+    data->set_friction_forward(real_t{1.0});
+    data->set_friction_lateral(real_t{1.0});
+    data->set_load_sensitivity(real_t{0.0});
+    data->set_relaxation_low(real_t{0.001});
+    data->set_relaxation_high(real_t{0.001});
+    data->set_combined_grip_exponent(exponent);
+    return data;
+}
+
+Wheel *make_combined_grip_wheel(const Ref<TireData> &tire) {
+    Wheel *wheel = memnew(Wheel);
+    wheel->set_tire(tire);
+    wheel->on_ground = true;
+    wheel->collision_point = Vector3();
+    wheel->collision_normal = Vector3(0.0, 1.0, 0.0);
+    wheel->forward_vector = Vector3(0.0, 0.0, 1.0);
+    wheel->right_vector = Vector3(1.0, 0.0, 0.0);
+    wheel->set_normal_force(real_t{10.0});
+    wheel->tire_force = Vector3();
+    return wheel;
+}
+
 Ref<DifferentialData> make_differential_data(
         DifferentialData::Mode mode,
         real_t preload = real_t{0.0},
@@ -109,6 +138,17 @@ Axle *make_axle(real_t drive_share, real_t radius = real_t{0.3},
     axle->add_child(memnew(Wheel));
     axle->add_child(memnew(Wheel));
     axle->_ready();
+    return axle;
+}
+
+Axle *make_unready_axle(real_t drive_share) {
+    Axle *axle = memnew(Axle);
+    axle->set_drive_share(drive_share);
+    if (drive_share > real_t{0.0})
+        axle->set_differential_data(make_differential_data(DifferentialData::OPEN));
+    axle->set_tire_data(make_tire_data());
+    axle->add_child(memnew(Wheel));
+    axle->add_child(memnew(Wheel));
     return axle;
 }
 
@@ -907,6 +947,106 @@ void test_engine(TestState &state) {
                  "VehicleEngine rev limit cuts throttle torque");
 }
 
+void test_tire_combined_grip(TestState &state) {
+    Ref<TireData> defaults = memnew(TireData);
+    state.expect(near(defaults->get_combined_grip_exponent(), real_t{2.0}),
+                 "TireData combined-grip exponent defaults to p=2");
+
+    defaults->set_combined_grip_exponent(real_t{0.25});
+    state.expect(near(defaults->get_combined_grip_exponent(), real_t{1.0}),
+                 "TireData combined-grip exponent clamps finite lower bound");
+    defaults->set_combined_grip_exponent(real_t{32.0});
+    state.expect(near(defaults->get_combined_grip_exponent(), real_t{16.0}),
+                 "TireData combined-grip exponent clamps finite upper bound");
+    defaults->set_combined_grip_exponent(std::numeric_limits<real_t>::quiet_NaN());
+    state.expect(near(defaults->get_combined_grip_exponent(), real_t{2.0}),
+                 "TireData combined-grip exponent resets NaN to default");
+    defaults->set_combined_grip_exponent(std::numeric_limits<real_t>::infinity());
+    state.expect(near(defaults->get_combined_grip_exponent(), real_t{2.0}),
+                 "TireData combined-grip exponent resets infinity to default");
+
+    // Flat friction curves make both normalized force components exactly one,
+    // so the established p=2 path has a retained vector magnitude of 10 N.
+    // p=4 must retain more simultaneous force, and the wheel copies the
+    // resource exponent at set_tire time rather than observing later edits.
+    Ref<TireData> p2_tire = make_grip_tire(real_t{2.0});
+    Wheel *p2_wheel = make_combined_grip_wheel(p2_tire);
+    p2_wheel->solve_tire(Vector3(), Vector3(3.0, 0.0, 3.0), Vector3(),
+                         real_t{0.1}, real_t{0.0}, false);
+    const Vector3 p2_force = p2_wheel->tire_force;
+    const real_t p2_magnitude = p2_force.length();
+    state.expect(near(p2_force.x, real_t{-7.0710678}, real_t{2e-4}) &&
+                     near(p2_force.z, real_t{-7.0710678}, real_t{2e-4}) &&
+                     near(p2_magnitude, real_t{10.0}, real_t{2e-4}),
+                 "Wheel combined-grip p=2 preserves established ellipse result");
+    memdelete(p2_wheel);
+
+    Ref<TireData> p4_tire = make_grip_tire(real_t{4.0});
+    Wheel *p4_wheel = make_combined_grip_wheel(p4_tire);
+    p4_tire->set_combined_grip_exponent(real_t{2.0});
+    p4_wheel->solve_tire(Vector3(), Vector3(3.0, 0.0, 3.0), Vector3(),
+                         real_t{0.1}, real_t{0.0}, false);
+    const Vector3 p4_force = p4_wheel->tire_force;
+    const real_t p4_magnitude = p4_force.length();
+    const real_t expected_p4_magnitude = real_t{10.0} * std::pow(real_t{2.0}, real_t{0.25});
+    state.expect(p4_magnitude > p2_magnitude + real_t{1.0} &&
+                     near(p4_magnitude, expected_p4_magnitude, real_t{2e-4}) &&
+                     std::abs(p4_force.x) > std::abs(p2_force.x) &&
+                     std::abs(p4_force.z) > std::abs(p2_force.z),
+                 "Wheel combined-grip p>2 retains more simultaneous force and copies exponent");
+    memdelete(p4_wheel);
+}
+
+void test_vehicle_center_of_mass_marker(TestState &state) {
+    const Transform3D vehicle_transform(
+            Basis(Vector3(0.0, 1.0, 0.0), real_t{0.6}),
+            Vector3(10.0, 2.0, -3.0));
+    const Vector3 marker_local(1.25, -0.5, 0.75);
+
+    SceneTree *scene_tree = Object::cast_to<SceneTree>(
+            Engine::get_singleton()->get_main_loop());
+    Window *scene_root = scene_tree != nullptr ? scene_tree->get_root() : nullptr;
+    state.expect(scene_root != nullptr,
+                 "Vehicle COM fixture has a live SceneTree root");
+    if (scene_root == nullptr)
+        return;
+
+    Vehicle *marked_vehicle = memnew(Vehicle);
+    marked_vehicle->set_config(make_valid_config());
+    marked_vehicle->set_mass(real_t{1200.0});
+    marked_vehicle->set_global_transform(vehicle_transform);
+    Marker3D *marker = memnew(Marker3D);
+    marker->set_position(marker_local);
+    marked_vehicle->add_child(marker);
+    marked_vehicle->add_child(make_unready_axle(real_t{1.0}));
+    marked_vehicle->set_center_of_mass_marker(marker);
+    scene_root->add_child(marked_vehicle);
+    const Vector3 marked_com = marked_vehicle->get_center_of_mass();
+    state.expect(marked_vehicle->get_center_of_mass_mode() == RigidBody3D::CENTER_OF_MASS_MODE_CUSTOM &&
+                     near(marked_com.x, marker_local.x) && near(marked_com.y, marker_local.y) &&
+                     near(marked_com.z, marker_local.z),
+                 "Vehicle marker assigns transformed global position as local custom COM");
+    scene_root->remove_child(marked_vehicle);
+    memdelete(marked_vehicle);
+
+    Vehicle *manual_vehicle = memnew(Vehicle);
+    manual_vehicle->set_config(make_valid_config());
+    manual_vehicle->set_mass(real_t{1200.0});
+    const Vector3 manual_com(0.2, -0.3, 0.4);
+    manual_vehicle->set_center_of_mass_mode(RigidBody3D::CENTER_OF_MASS_MODE_CUSTOM);
+    manual_vehicle->set_center_of_mass(manual_com);
+    manual_vehicle->add_child(make_unready_axle(real_t{1.0}));
+    scene_root->add_child(manual_vehicle);
+    const Vector3 retained_com = manual_vehicle->get_center_of_mass();
+    state.expect(manual_vehicle->get_center_of_mass_marker() == nullptr &&
+                     manual_vehicle->get_center_of_mass_mode() == RigidBody3D::CENTER_OF_MASS_MODE_CUSTOM &&
+                     near(retained_com.x, manual_com.x) && near(retained_com.y, manual_com.y) &&
+                     near(retained_com.z, manual_com.z),
+                 "Vehicle null marker preserves manual custom COM");
+    scene_root->remove_child(manual_vehicle);
+    memdelete(manual_vehicle);
+}
+
 void test_setup_validation(TestState &state) {
     String error;
     state.expect(!VehicleSetupValidation::validate(Ref<VehicleConfig>(), {}, error) &&
@@ -1058,6 +1198,8 @@ bool DrivetrainRegression::run() {
     test_rotational_network(state);
     test_gearbox(state);
     test_engine(state);
+    test_tire_combined_grip(state);
+    test_vehicle_center_of_mass_marker(state);
     test_setup_validation(state);
     if (state.failures != 0)
         UtilityFunctions::printerr("[drivetrain-regression] ", state.failures,

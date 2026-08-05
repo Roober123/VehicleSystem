@@ -60,7 +60,10 @@ func _process(dt: float) -> void:
 		forward_throttle = 0.0
 		reverse_throttle = move_toward(
 			reverse_throttle, reverse_pressed, THROTTLE_RISE_RATE * dt)
-		$Vehicle.set_throttle_input(0.0)
+		# Vehicle swaps the pedal roles in reverse: brake_input drives the
+		# engine and throttle_input is passed to the wheel brakes. Keep reverse
+		# acceleration smoothed, but apply the opposing pedal as a direct brake.
+		$Vehicle.set_throttle_input(forward_pressed)
 		$Vehicle.set_brake_input(reverse_throttle)
 	else:
 		reverse_throttle = 0.0

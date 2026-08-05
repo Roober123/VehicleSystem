@@ -4,7 +4,7 @@
 		A resource that defines tire parameters for the tanh-based tire model.
 	</brief_description>
 	<description>
-		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), and relaxation times for force smoothing.
+		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), relaxation times for force smoothing, and the combined-grip exponent. Tire parameters are copied to each [Wheel] during running-gear setup.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -20,6 +20,9 @@
 		</member>
 		<member name="lateral_friction_curve" type="Curve" setter="set_lateral_friction_curve" getter="get_lateral_friction_curve">
 			Optional [Curve] resource for custom lateral friction response. Maps normalized slip angle (0-2) to a friction multiplier. Overrides the default tanh-based model.
+		</member>
+		<member name="combined_grip_exponent" type="float" setter="set_combined_grip_exponent" getter="get_combined_grip_exponent" default="2.0">
+			Exponent [code]p[/code] for combining normalized longitudinal and lateral force. The value is clamped to [1, 16] (default 2). [code]p=2[/code] is the established friction ellipse; larger values progressively retain more simultaneous normalized longitudinal/lateral force before limiting. The configured value is copied to each [Wheel] during setup.
 		</member>
 		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.3">
 			Tire radius in meters.

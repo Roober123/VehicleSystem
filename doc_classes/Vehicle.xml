@@ -6,11 +6,22 @@
 	<description>
 		Vehicle owns setup and physics-frame ordering while delegating running gear and drivetrain phases to value-owned components. Configure one [VehicleConfig] resource and exactly-two-wheel [Axle] children before runtime. Setup validation is fail-closed and one-shot; replacing the config after initialization is rejected.
 
+		The optional [Marker3D] assigned to [member center_of_mass_marker] is an Inspector convenience for authoring the center of mass. After setup validation succeeds and before running-gear setup begins, [method _ready] converts the marker's global position to Vehicle-local coordinates once and applies it as [constant RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM]. If the marker is [code]null[/code], Vehicle leaves the [RigidBody3D] center-of-mass mode and value untouched, preserving manual rigid-body configuration.
+
 		The drivetrain exposes command methods for shifting. Telemetry is assembled as an immutable C++ [code]VehicleTelemetrySnapshot[/code] value rather than a live component reference.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="set_center_of_mass_marker" qualifiers="">
+			<return type="void" />
+			<param index="0" name="marker" type="Marker3D" />
+			<description>Sets the optional Inspector marker used to author the center of mass before one-shot setup.</description>
+		</method>
+		<method name="get_center_of_mass_marker" qualifiers="const">
+			<return type="Marker3D" />
+			<description>Returns the optional center-of-mass authoring marker.</description>
+		</method>
 		<method name="set_config" qualifiers="">
 			<return type="void" />
 			<param index="0" name="config" type="VehicleConfig" />
@@ -96,6 +107,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="center_of_mass_marker" type="Marker3D" setter="set_center_of_mass_marker" getter="get_center_of_mass_marker">
+			Optional Inspector [Marker3D]. On successful one-shot setup, its global position is converted once to Vehicle-local coordinates and applied as the custom center of mass before running-gear setup. [code]null[/code] leaves the [RigidBody3D] center-of-mass mode and value unchanged.
+		</member>
 		<member name="config" type="VehicleConfig" setter="set_config" getter="get_config">
 			Setup resource containing required engine, gearbox, suspension, and optional aerodynamics/turbo data.
 		</member>

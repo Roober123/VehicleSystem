@@ -38,6 +38,7 @@ void Wheel::set_tire(const Ref<TireData>& t) {
     this->relaxation_low = t->relaxation_low;
     this->relaxation_high = t->relaxation_high;
     this->load_sensitivity = t->get_load_sensitivity();
+    this->combined_grip_exponent = t->get_combined_grip_exponent();
 
     // Pass tire width to the skid system
     if (skid)
@@ -287,13 +288,23 @@ void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angl
 real_t Wheel::_combine_forces(real_t raw_fwd, real_t raw_lat, real_t normal,
                                real_t fwd_mu, real_t lat_mu,
                                real_t& out_fwd, real_t& out_lat) const {
-    constexpr real_t min_mu = real_t{1e-6};
-    real_t nx = lat_mu > min_mu ? raw_lat / (lat_mu * normal) : real_t{0.0};
-    real_t ny = fwd_mu > min_mu ? raw_fwd / (fwd_mu * normal) : real_t{0.0};
-    real_t sum = std::sqrt(nx * nx + ny * ny);
+    const real_t nx = raw_lat / (lat_mu * normal);
+    const real_t ny = raw_fwd / (fwd_mu * normal);
+
+    real_t sum;
+    if (combined_grip_exponent == real_t{2.0}) {
+        // Keep the established p=2 path numerically identical to the
+        // original friction ellipse.
+        sum = std::sqrt(nx * nx + ny * ny);
+    } else {
+        real_t lateral_pow = std::pow(std::abs(nx), combined_grip_exponent);
+        real_t longitudinal_pow = std::pow(std::abs(ny), combined_grip_exponent);
+        sum = std::pow(lateral_pow + longitudinal_pow, real_t{1.0} / combined_grip_exponent);
+    }
 
     out_fwd = raw_fwd;
     out_lat = raw_lat;
+
     if (sum > real_t{1.0}) {
         real_t r = real_t{1.0} / sum;
         out_fwd *= r;
