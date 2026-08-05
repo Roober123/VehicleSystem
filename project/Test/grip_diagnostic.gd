@@ -167,9 +167,9 @@ func _sample(vehicle: Vehicle, telemetry: VehicleTelemetry) -> Dictionary:
 	var forces: Array[Vector3] = []
 	var grounded := 0
 	for wheel in wheels:
-		var rpm := wheel.get_angular_velocity() * 60.0 / TAU
+		var rpm := telemetry.get_wheel_rpm(wheel)
 		rpms.append(rpm)
-		forces.append(wheel.get_tire_force())
+		forces.append(telemetry.get_tire_force(wheel))
 		if wheel.is_on_ground():
 			grounded += 1
 	var local_velocity := vehicle.global_transform.basis.inverse() * vehicle.linear_velocity
@@ -180,7 +180,7 @@ func _sample(vehicle: Vehicle, telemetry: VehicleTelemetry) -> Dictionary:
 	# Loss proxy is deliberately decomposed in the output: lateral velocity
 	# ratio plus a bounded yaw-rate contribution, not a pass/fail threshold.
 	var loss_proxy := lateral_ratio + minf(absf(yaw_rate) * 0.2, 2.0)
-	var telemetry_rpms := telemetry.get_wheel_angular_velocities()
+	var telemetry_rpms := telemetry.get_wheel_rpms()
 	return {
 		"speed_kph": speed_kph,
 		"engine_rpm": telemetry.get_engine_rpm(),

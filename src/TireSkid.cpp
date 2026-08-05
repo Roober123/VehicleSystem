@@ -1,19 +1,20 @@
 #include "TireSkid.h"
+
+#include <algorithm>
+#include <cmath>
+
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
-
-#include <cmath>
+#include "godot_cpp/classes/surface_tool.hpp"
 
 namespace godot {
 
 void TireSkid::_bind_methods() {
-    
 }
 
 TireSkid::TireSkid() {
     set_process(true);
 }
-
 
 void TireSkid::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
@@ -25,26 +26,26 @@ void TireSkid::_ready() {
     material->set_albedo(Color(real_t{0.05}, real_t{0.05}, real_t{0.05}, real_t{1.0}));
     material->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
     material->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
+    material->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
 
-    // Create mesh instance
     mesh_instance = memnew(MeshInstance3D);
     mesh_instance->set_name("SkidMesh");
     add_child(mesh_instance);
     mesh_instance->set_owner(this);
 
-    mesh.instantiate();
-    mesh_instance->set_mesh(mesh);
+    Ref<ArrayMesh> empty_mesh;
+    empty_mesh.instantiate();
+    mesh_instance->set_mesh(empty_mesh);
 }
 
-void TireSkid::_process(double delta) {
+void TireSkid::_process(double) {
     if (reparent_needed) {
         reparent_needed = false;
         Node *parent = get_parent();
-        if (parent && is_inside_tree()) {
+        if (parent != nullptr && is_inside_tree()) {
             Node *root = get_tree()->get_current_scene();
-            if (root && root != parent) {
+            if (root != nullptr && root != parent)
                 reparent(root, true);
-            }
         }
     }
 
@@ -55,166 +56,178 @@ void TireSkid::_process(double delta) {
             mesh_dirty = false;
         }
     }
-    for (int i = 0; i < MAX_RIBBONS; i++)
-        if (!ribbons[i].active)
-            ribbons[i].age += delta;
+}
+
+real_t TireSkid::_calculate_intensity(const SkidContactSample &sample) const {
+    if (!(sample.normal_load > real_t{1e-6}) || !std::isfinite(sample.normal_load))
+        return real_t{0.0};
+
+    const real_t normalized_power =
+            (std::abs(sample.longitudinal_force * sample.longitudinal_slip_velocity) +
+             std::abs(sample.lateral_force * sample.lateral_slip_velocity)) /
+            sample.normal_load;
+    if (!std::isfinite(normalized_power))
+        return real_t{0.0};
+
+    return std::clamp((normalized_power - INTENSITY_ONSET) /
+                              (FULL_INTENSITY - INTENSITY_ONSET),
+                      real_t{0.0}, real_t{1.0});
+}
+
+SkidMarkSection TireSkid::_make_section(const SkidContactSample &sample,
+                                        const Vector3 &world_center,
+                                        real_t intensity,
+                                        bool connected) const {
+    const Vector3 raised_center = world_center + sample.contact_normal * GROUND_OFFSET;
+    const auto local_point = [this](const Vector3 &point) {
+        return is_inside_tree() ? to_local(point) : point;
+    };
+    SkidMarkSection section;
+    section.center = local_point(raised_center);
+    section.normal =
+            (local_point(raised_center + sample.contact_normal) - section.center).normalized();
+    const Vector3 world_lateral = sample.contact_normal.cross(sample.tire_direction).normalized();
+    section.lateral_direction =
+            (local_point(raised_center + world_lateral) - section.center).normalized();
+    section.intensity = intensity;
+    section.connected_to_previous = connected;
+    return section;
+}
+
+void TireSkid::_start_segment(const SkidContactSample &sample, real_t intensity) {
+    Vector3 patch_direction = sample.ground_velocity;
+    if (patch_direction.length_squared() < STATIONARY_SPEED * STATIONARY_SPEED)
+        patch_direction = sample.tire_direction;
+    patch_direction.normalize();
+
+    buffer.push(_make_section(sample,
+                              sample.contact_position - patch_direction * STATIONARY_PATCH_LENGTH,
+                              intensity, false));
+    buffer.push(_make_section(sample, sample.contact_position, intensity, true));
+    segment_active = true;
+    last_contact_position = sample.contact_position;
+    distance_since_section = real_t{0.0};
+    release_elapsed = real_t{0.0};
+    mesh_dirty = true;
+}
+
+void TireSkid::_append_moving_sections(const SkidContactSample &sample, real_t intensity) {
+    const Vector3 displacement = sample.contact_position - last_contact_position;
+    const real_t distance = displacement.length();
+    if (distance <= real_t{0.0})
+        return;
+
+    const Vector3 direction = displacement / distance;
+    Vector3 cursor = last_contact_position;
+    real_t remaining = distance;
+    while (distance_since_section + remaining >= POINT_SPACING) {
+        const real_t step = POINT_SPACING - distance_since_section;
+        cursor += direction * step;
+        buffer.push(_make_section(sample, cursor, intensity, true));
+        remaining -= step;
+        distance_since_section = real_t{0.0};
+        mesh_dirty = true;
+    }
+    distance_since_section += remaining;
+    last_contact_position = sample.contact_position;
+}
+
+void TireSkid::submit_sample(const SkidContactSample &sample, real_t dt) {
+    const real_t intensity = _calculate_intensity(sample);
+    if (intensity <= real_t{0.0}) {
+        if (!segment_active)
+            return;
+        release_elapsed += dt;
+        if (release_elapsed >= RELEASE_GRACE)
+            stop_skid();
+        return;
+    }
+
+    release_elapsed = real_t{0.0};
+    if (!segment_active) {
+        _start_segment(sample, intensity);
+        return;
+    }
+
+    if (last_contact_position.distance_to(sample.contact_position) >
+        MAX_CONTINUOUS_DISPLACEMENT) {
+        segment_active = false;
+        _start_segment(sample, intensity);
+        return;
+    }
+
+    if (sample.ground_velocity.length_squared() < STATIONARY_SPEED * STATIONARY_SPEED) {
+        buffer.darken_last_pair(intensity);
+        mesh_dirty = true;
+        last_contact_position = sample.contact_position;
+        return;
+    }
+
+    _append_moving_sections(sample, intensity);
 }
 
 void TireSkid::stop_skid() {
-    if (active_ribbon_index < 0) return;
-    if (ribbons[active_ribbon_index].active == true)
-        _finish_active_ribbon();
+    segment_active = false;
+    distance_since_section = real_t{0.0};
+    release_elapsed = real_t{0.0};
 }
-
-void TireSkid::update_skid(const Vector3 &contact_position,
-                            const Vector3 &contact_normal,
-                            const Vector3 &travel_direction) {
-    if (active_ribbon_index < 0) {
-        // First point of a new skid event — create a ribbon
-        int idx = _find_or_create_active_ribbon();
-        if (idx < 0) return;
-        SkidRibbon &rib = ribbons[idx];
-        rib.travel_distance = real_t{0.0};
-        rib.points[rib.point_count++] = _get_skidpoint_from_data(
-            contact_position, contact_normal, travel_direction);
-        mesh_dirty = true;
-        return;
-    }
-    if (ribbons[active_ribbon_index].point_count == 0)
-        return;
-
-    SkidRibbon &rib = ribbons[active_ribbon_index];
-    SkidPoint &last = rib.points[rib.point_count - 1];
-    real_t dist = std::sqrt(last.center.distance_squared_to(contact_position));
-    rib.travel_distance += dist;
-
-    if (rib.travel_distance < POINT_SPACING)
-        return;
-
-    // Reset accumulator (keep the remainder to avoid drift)
-    rib.travel_distance -= POINT_SPACING;
-
-    int idx = _find_or_create_active_ribbon();
-    ribbons[idx].points[ribbons[idx].point_count++] = _get_skidpoint_from_data(
-        contact_position, contact_normal, travel_direction);
-    mesh_dirty = true;
-}
-
-int TireSkid::_find_or_create_active_ribbon() {
-    if (active_ribbon_index != -1 && 
-        ribbons[active_ribbon_index].point_count < MAX_POINTS &&
-        ribbons[active_ribbon_index].active)
-            return active_ribbon_index;
-    if (active_ribbon_index >= 0 && ribbons[active_ribbon_index].point_count == MAX_POINTS)
-        _finish_active_ribbon();
-
-    int oldest_idx = -1;
-    for (int i = 0; i < MAX_RIBBONS; i++)
-        if (ribbons[i].active == false 
-            && (oldest_idx == -1 || ribbons[i].age > ribbons[oldest_idx].age))
-            oldest_idx = i;
-
-    if (oldest_idx < 0) {
-        return -1;
-    }
-
-    ribbons[oldest_idx].active = true;
-    ribbons[oldest_idx].point_count = 0;
-    ribbons[oldest_idx].age = 0.0;
-    ribbons[oldest_idx].travel_distance = real_t{0.0};
-    mesh_dirty = true;
-    active_ribbon_index = oldest_idx;
-    return oldest_idx;
-}
-
-void TireSkid::_finish_active_ribbon() {
-    if (active_ribbon_index < 0) return;
-    ribbons[active_ribbon_index].active = false;
-    ribbons[active_ribbon_index].age = 0.0;
-    active_ribbon_index = -1;
-}
-
-SkidPoint TireSkid::_get_skidpoint_from_data(const Vector3 &contact_position, const Vector3 &contact_normal,
-                    const Vector3 &travel_direction) {
-    SkidPoint s;
-    Vector3 pos = contact_position + contact_normal * GROUND_OFFSET;
-    s.normal = to_local(pos + contact_normal) - to_local(pos);
-    s.normal.normalize();
-    s.center = to_local(pos);
-    Vector3 r_vec = contact_normal.cross(travel_direction);
-    if (r_vec.length_squared() < 1e-6f) r_vec = Vector3(1.0, 0.0, 0.0);
-    r_vec.normalize();
-    s.left = to_local(pos - r_vec * ribbon_width * real_t{0.5});
-    s.right = to_local(pos + r_vec * ribbon_width * real_t{0.5});
-    return s;
-}
-
-
 
 void TireSkid::_rebuild_mesh() {
-    int total_points = 0;
-    for (int r = 0; r < MAX_RIBBONS; ++r) {
-        if (ribbons[r].point_count > 0)
-            total_points += ribbons[r].point_count;
-    }
-
-    if (total_points < 2) {
-        // Assign a fresh empty mesh to clear old geometry
-        mesh.instantiate();
-        mesh_instance->set_mesh(mesh);
+    if (mesh_instance == nullptr)
         return;
-    }
 
-    Ref<SurfaceTool> st;
-    st.instantiate();
-    st->begin(Mesh::PRIMITIVE_TRIANGLES);
+    Ref<SurfaceTool> surface;
+    surface.instantiate();
+    surface->begin(Mesh::PRIMITIVE_TRIANGLES);
 
-    int vertex_offset = 0;  // tracks global vertex index across ribbons
-
-    for (int r = 0; r < MAX_RIBBONS; ++r) {
-        const SkidRibbon &rib = ribbons[r];
-        if (rib.point_count < 2)
+    int vertex_offset = 0;
+    for (std::size_t i = 1; i < buffer.size(); ++i) {
+        const SkidMarkSection &previous = buffer.section_at(i - 1);
+        const SkidMarkSection &current = buffer.section_at(i);
+        if (!current.connected_to_previous)
             continue;
 
-        for (int i = 0; i < rib.point_count; ++i) {
-            const SkidPoint &pt = rib.points[i];
+        const bool finite = previous.center.is_finite() && previous.normal.is_finite() &&
+                            previous.lateral_direction.is_finite() &&
+                            current.center.is_finite() && current.normal.is_finite() &&
+                            current.lateral_direction.is_finite() &&
+                            std::isfinite(previous.intensity) && std::isfinite(current.intensity);
+        if (!finite)
+            continue;
 
-            st->set_color(Color(real_t{0.0}, real_t{0.0}, real_t{0.0}, 1.0));
-            st->set_normal(pt.normal);
-            st->add_vertex(pt.left);
-
-            st->set_color(Color(real_t{0.0}, real_t{0.0}, real_t{0.0}, 1.0));
-            st->set_normal(pt.normal);
-            st->add_vertex(pt.right);
+        const Vector3 previous_half = previous.lateral_direction * ribbon_width * real_t{0.5};
+        const Vector3 current_half = current.lateral_direction * ribbon_width * real_t{0.5};
+        const SkidMarkSection *ends[2] = {&previous, &current};
+        const Vector3 halves[2] = {previous_half, current_half};
+        for (int end = 0; end < 2; ++end) {
+            const Color color(real_t{0.0}, real_t{0.0}, real_t{0.0},
+                              ends[end]->intensity);
+            surface->set_color(color);
+            surface->set_normal(ends[end]->normal);
+            surface->add_vertex(ends[end]->center - halves[end]);
+            surface->set_color(color);
+            surface->set_normal(ends[end]->normal);
+            surface->add_vertex(ends[end]->center + halves[end]);
         }
 
-        // Build triangle strip: global vertices are at
-        // [vertex_offset, vertex_offset+1, vertex_offset+2, ...]
-        // Each point i contributes: L_i at (vertex_offset + i*2), R_i at (vertex_offset + i*2 + 1)
-        for (int i = 0; i < rib.point_count - 1; ++i) {
-            int base = vertex_offset + i * 2;
-
-            // Tri 1: L_i  R_i  L_{i+1}
-            st->add_index(base + 0);
-            st->add_index(base + 1);
-            st->add_index(base + 2);
-
-            // Tri 2: L_{i+1}  R_i  R_{i+1}
-            st->add_index(base + 2);
-            st->add_index(base + 1);
-            st->add_index(base + 3);
-        }
-
-        vertex_offset += rib.point_count * 2;
+        surface->add_index(vertex_offset + 0);
+        surface->add_index(vertex_offset + 1);
+        surface->add_index(vertex_offset + 2);
+        surface->add_index(vertex_offset + 2);
+        surface->add_index(vertex_offset + 1);
+        surface->add_index(vertex_offset + 3);
+        vertex_offset += 4;
     }
 
-    st->set_material(material);
-    mesh->clear_surfaces();
-    Ref<ArrayMesh> new_mesh = st->commit(mesh);
-    if (new_mesh.is_valid()) {
-        mesh = new_mesh;
-        mesh_instance->set_mesh(mesh);
+    Ref<ArrayMesh> rebuilt_mesh;
+    rebuilt_mesh.instantiate();
+    if (vertex_offset > 0) {
+        surface->set_material(material);
+        Ref<ArrayMesh> committed = surface->commit(rebuilt_mesh);
+        if (committed.is_valid())
+            rebuilt_mesh = committed;
     }
+    mesh_instance->set_mesh(rebuilt_mesh);
 }
 
 } // namespace godot

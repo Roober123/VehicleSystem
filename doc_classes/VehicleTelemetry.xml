@@ -4,7 +4,7 @@
 		Telemetry node that reads and exposes vehicle drivetrain data for UI or debugging.
 	</brief_description>
 	<description>
-		VehicleTelemetry is a [Node] that reads an immutable [VehicleTelemetrySnapshot] value from a [Vehicle] and exposes it through readable accessors. It caches the target's wheel layout once it is available, then reuses bounded arrays for per-wheel values. Clutch engagement, requested torque, transmitted torque, output torque, signed slip, and slipping state are flattened scalar snapshot fields. It can auto-detect its target by checking the parent or sibling nodes, or assign one manually via [method set_target].
+		VehicleTelemetry is a [Node] that reads an immutable [VehicleTelemetrySnapshot] value from a [Vehicle] and exposes it through readable accessors. It caches the target's wheel layout once it is available, then reuses bounded arrays for per-wheel values. Pass a [Wheel] reference to [method get_wheel_rpm], [method get_tire_force], or [method get_tire_telemetry] when data for one tire is needed. Clutch engagement, requested torque, transmitted torque, output torque, signed slip, and slipping state are flattened scalar snapshot fields. It can auto-detect its target by checking the parent or sibling nodes, or assign one manually via [method set_target].
 
 		Use this node to display real-time data like RPM, speed, gear, and clutch engagement in a HUD or debug overlay.
 	</description>
@@ -108,10 +108,10 @@
 				Returns the current turbo boost value from the cached vehicle snapshot.
 			</description>
 		</method>
-		<method name="get_wheel_angular_velocities" qualifiers="const">
+		<method name="get_wheel_rpms" qualifiers="const">
 			<return type="PackedFloat64Array" />
 			<description>
-				Returns an array of wheel angular velocities in RPM, one per wheel across all axles.
+				Returns wheel speeds in RPM, flattened in axle order.
 			</description>
 		</method>
 		<method name="get_tire_forces" qualifiers="const">
@@ -119,6 +119,21 @@
 			<description>
 				Returns an array of per-wheel tire forces (world-space vectors), one per wheel across all axles.
 			</description>
+		</method>
+		<method name="get_wheel_rpm" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="wheel" type="Wheel" />
+			<description>Returns the selected wheel's speed in RPM, or 0.0 for a [code]null[/code] reference.</description>
+		</method>
+		<method name="get_tire_force" qualifiers="const">
+			<return type="Vector3" />
+			<param index="0" name="wheel" type="Wheel" />
+			<description>Returns the selected wheel's world-space tire force, or a zero vector for a [code]null[/code] reference.</description>
+		</method>
+		<method name="get_tire_telemetry" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="wheel" type="Wheel" />
+			<description>Returns runtime data for one tire. Keys are [code]wheel[/code], [code]wheel_rpm[/code], [code]tire_force[/code], [code]normal_load[/code], [code]slip_ratio[/code], [code]slip_angle_degrees[/code], [code]grounded[/code], [code]sliding[/code], [code]abs_active[/code], [code]contact_position[/code], [code]contact_normal[/code], and [code]grip_multiplier[/code]. Returns an empty dictionary for a [code]null[/code] reference.</description>
 		</method>
 	</methods>
 </class>

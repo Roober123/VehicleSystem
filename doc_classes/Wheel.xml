@@ -4,7 +4,7 @@
 		A vehicle wheel with suspension raycasting and tire-force simulation.
 	</brief_description>
 	<description>
-		Wheel is a [Node3D] child of an [Axle]. Vehicle setup requires exactly two distinct wheels per axle. The wheel owns suspension contact state, tire forces, rotation, and an internally created raycast/skid-mark helper; only the bound read-only accessors below are part of the Godot API.
+		Wheel is a [Node3D] child of an [Axle]. Vehicle setup requires exactly two distinct wheels per axle. The wheel owns suspension contact state, tire forces, rotation, and an internally created raycast/skid-mark helper. After relaxation and combined-grip limiting, a grounded solve submits contact geometry, slip velocities, final tire forces, and normal load to that helper. This does not change tire-force or traction-control behavior. Only the bound read-only accessors below are part of the Godot API.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -33,5 +33,29 @@
 			<return type="float" />
 			<description>Returns the current longitudinal slip ratio.</description>
 		</method>
+		<method name="get_slip_angle" qualifiers="const">
+			<return type="float" />
+			<description>Returns the current lateral slip angle in degrees.</description>
+		</method>
+		<method name="get_is_sliding" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether longitudinal or lateral slip currently exceeds the tire sliding threshold.</description>
+		</method>
+		<method name="get_abs_active" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether ABS is currently reducing brake pressure for this wheel.</description>
+		</method>
+		<method name="set_grip_multiplier" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>Sets the runtime multiplier applied to both longitudinal and lateral tire grip.</description>
+		</method>
+		<method name="get_grip_multiplier" qualifiers="const">
+			<return type="float" />
+			<description>Returns the runtime tire-grip multiplier.</description>
+		</method>
 	</methods>
+	<members>
+		<member name="grip_multiplier" type="float" setter="set_grip_multiplier" getter="get_grip_multiplier" default="1.0">Runtime multiplier for authored longitudinal and lateral grip. Use 1.0 for authored grip, 0.0 for no tire force, and values above 1.0 for additional grip.</member>
+	</members>
 </class>

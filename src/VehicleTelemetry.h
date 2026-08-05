@@ -1,6 +1,7 @@
 #pragma once
 #include "godot_cpp/classes/node.hpp"
 #include <godot_cpp/core/class_db.hpp>
+#include "godot_cpp/variant/dictionary.hpp"
 #include "vehicle.h"
 
 namespace godot {
@@ -14,7 +15,7 @@ class VehicleTelemetry : public Node {
     bool wheel_topology_cached = false;
 
     void cache_wheel_views();
-    PackedFloat64Array wheel_angular_velocities;
+    PackedFloat64Array wheel_rpms;
     PackedVector3Array tire_forces;
 
 
@@ -46,8 +47,11 @@ public:
     real_t get_gear_ratio() const { return snapshot.gear_ratio; }
     real_t get_vehicle_speed_kph() const { return snapshot.vehicle_speed_kph; }
     real_t get_turbo_boost() const { return snapshot.turbo_boost; }
-    PackedFloat64Array get_wheel_angular_velocities() const { return wheel_angular_velocities; }
+    PackedFloat64Array get_wheel_rpms() const { return wheel_rpms; }
     PackedVector3Array get_tire_forces() const { return tire_forces; }
+    real_t get_wheel_rpm(Wheel *wheel) const;
+    Vector3 get_tire_force(Wheel *wheel) const;
+    Dictionary get_tire_telemetry(Wheel *wheel) const;
 };
 
 } // namespace godot

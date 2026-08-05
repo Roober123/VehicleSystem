@@ -23,8 +23,14 @@ void VehicleTelemetry::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_gear_ratio"), &VehicleTelemetry::get_gear_ratio);
     ClassDB::bind_method(D_METHOD("get_vehicle_speed_kph"), &VehicleTelemetry::get_vehicle_speed_kph);
     ClassDB::bind_method(D_METHOD("get_turbo_boost"), &VehicleTelemetry::get_turbo_boost);
-    ClassDB::bind_method(D_METHOD("get_wheel_angular_velocities"), &VehicleTelemetry::get_wheel_angular_velocities);
+    ClassDB::bind_method(D_METHOD("get_wheel_rpms"), &VehicleTelemetry::get_wheel_rpms);
     ClassDB::bind_method(D_METHOD("get_tire_forces"), &VehicleTelemetry::get_tire_forces);
+    ClassDB::bind_method(D_METHOD("get_wheel_rpm", "wheel"),
+                         &VehicleTelemetry::get_wheel_rpm);
+    ClassDB::bind_method(D_METHOD("get_tire_force", "wheel"),
+                         &VehicleTelemetry::get_tire_force);
+    ClassDB::bind_method(D_METHOD("get_tire_telemetry", "wheel"),
+                         &VehicleTelemetry::get_tire_telemetry);
 }
 
 void VehicleTelemetry::_ready() {
@@ -74,12 +80,12 @@ void VehicleTelemetry::_process(double delta) {
 
     int64_t wheel_index = 0;
     const int64_t wheel_capacity = std::min<int64_t>(
-        wheel_angular_velocities.size(), tire_forces.size());
+        wheel_rpms.size(), tire_forces.size());
     for (const Axle *axle : axle_views) {
         for (const Wheel* w : axle->get_wheels()) {
             if (wheel_index >= wheel_capacity)
                 return;
-            wheel_angular_velocities.set(wheel_index, w->get_angular_velocity() * ang_to_rpm);
+            wheel_rpms.set(wheel_index, w->get_angular_velocity() * ang_to_rpm);
             tire_forces.set(wheel_index, w->get_tire_force());
             ++wheel_index;
         }
@@ -95,9 +101,40 @@ Vehicle* VehicleTelemetry::get_target() const {
     return target;
 }
 
+real_t VehicleTelemetry::get_wheel_rpm(Wheel *wheel) const {
+    if (wheel == nullptr)
+        return real_t{0.0};
+    constexpr real_t ang_to_rpm = real_t{60.0} / (real_t{2.0} * Math_PI);
+    return wheel->get_angular_velocity() * ang_to_rpm;
+}
+
+Vector3 VehicleTelemetry::get_tire_force(Wheel *wheel) const {
+    return wheel != nullptr ? wheel->get_tire_force() : Vector3();
+}
+
+Dictionary VehicleTelemetry::get_tire_telemetry(Wheel *wheel) const {
+    Dictionary data;
+    if (wheel == nullptr)
+        return data;
+
+    data["wheel"] = wheel;
+    data["wheel_rpm"] = get_wheel_rpm(wheel);
+    data["tire_force"] = get_tire_force(wheel);
+    data["normal_load"] = wheel->get_suspension_rebound_force();
+    data["slip_ratio"] = wheel->get_slip_ratio();
+    data["slip_angle_degrees"] = wheel->get_slip_angle();
+    data["grounded"] = wheel->is_on_ground();
+    data["sliding"] = wheel->get_is_sliding();
+    data["abs_active"] = wheel->get_abs_active();
+    data["contact_position"] = wheel->get_collision_point();
+    data["contact_normal"] = wheel->get_collision_normal();
+    data["grip_multiplier"] = wheel->get_grip_multiplier();
+    return data;
+}
+
 void VehicleTelemetry::cache_wheel_views() {
     if (target == nullptr) {
-        wheel_angular_velocities.resize(0);
+        wheel_rpms.resize(0);
         tire_forces.resize(0);
         cached_wheel_count = 0;
         wheel_topology_cached = false;
@@ -109,14 +146,14 @@ void VehicleTelemetry::cache_wheel_views() {
         wheel_count += static_cast<int>(axle->get_wheels().size());
 
     if (wheel_count <= 0) {
-        wheel_angular_velocities.resize(0);
+        wheel_rpms.resize(0);
         tire_forces.resize(0);
         cached_wheel_count = 0;
         wheel_topology_cached = false;
         return;
     }
 
-    wheel_angular_velocities.resize(wheel_count);
+    wheel_rpms.resize(wheel_count);
     tire_forces.resize(wheel_count);
     cached_wheel_count = wheel_count;
     wheel_topology_cached = true;

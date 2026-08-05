@@ -18,11 +18,16 @@ runtime composition.
   differential rows, and `predict_velocity` for current transaction state;
   `commit` validates final torque and predicted velocity before mutating bodies.
 - Per-wheel suspension, tire forces, ABS, steering, aerodynamics, and traction
-  control.
-- `VehicleTelemetry` snapshot consumer with cached wheel layout and bounded
-  per-wheel arrays.
-- `TireSkid` procedural ribbons backed by a fixed-size recycling pool. No fade
-  or lifetime visual effect is promised.
+  control. Each `Wheel` exposes a runtime `grip_multiplier` for surface or
+  gameplay grip changes.
+- `VehicleTelemetry` snapshot consumer with cached wheel layout, bounded
+  per-wheel arrays, and wheel-reference helpers for RPM, force, and a compact
+  per-tire telemetry dictionary.
+- Load-normalized skid marks for wheelspin, braking, lateral slip, and
+  stationary burnouts. `TireSkid` keeps 2,048 cross-sections in an
+  oldest-replacing ring, samples moving marks every 0.10 m, and renders
+  independent alpha-weighted quads. Its internal onset filters ordinary
+  cornering scrub and brief shift transients. Marks do not fade with time.
 
 ## Getting started
 

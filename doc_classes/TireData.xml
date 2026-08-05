@@ -49,7 +49,7 @@
 			Force relaxation time in seconds at high speed (30 m/s+). Lower values give instant force response (10 ms default).
 		</member>
 		<member name="tire_width" type="float" setter="set_tire_width" getter="get_tire_width" default="0.25">
-			Width of the tire tread in metres. Used by [TireSkid] to set the ribbon width of skid marks.
+			Width of the tire tread in metres. Used by [TireSkid] to set skid-mark width.
 		</member>
 	</members>
 </class>

@@ -29,6 +29,7 @@ class Wheel : public Node3D {
     real_t reference_load = 1.0;
     real_t load_sensitivity = 0.10;
     real_t combined_grip_exponent = 2.0;
+    real_t grip_multiplier = 1.0;
 
     // tanh tire model parameters
     real_t peak_slip_angle = 10.0;     // degrees
@@ -76,8 +77,15 @@ class Wheel : public Node3D {
     void _apply_tire_forces(const Vector3& fwd_tangent, const Vector3& right_tangent,
                             real_t longitudinal_force, real_t lateral_force);
 
-    // Update tire skid marks
-    void _update_skidmarks(const Vector3& vel_point, real_t friction_sum, real_t dt);
+    // Submit the post-relaxation tire/contact state to the skid visualizer.
+    void _update_skidmarks(const Vector3& vel_point,
+                           const Vector3& fwd_tangent,
+                           real_t longitudinal_slip_velocity,
+                           real_t lateral_slip_velocity,
+                           real_t longitudinal_force,
+                           real_t lateral_force,
+                           real_t normal_load,
+                           real_t dt);
 
     // Apply brakes with optional ABS
     void _apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed,
@@ -96,6 +104,8 @@ class Wheel : public Node3D {
     TireSkid *skid = nullptr;
     void set_suspension(real_t suspension_length, real_t stiffness, real_t damping, real_t reference_load);
     void set_tire(const Ref<TireData>& t);
+    void set_grip_multiplier(real_t value);
+    real_t get_grip_multiplier() const { return grip_multiplier; }
     void add_drive_torque(real_t torque) { body.add_torque(torque); }
     void integrate_rotation(real_t dt) { body.integrate(dt); }
     /// Returns the final non-tensile contact force, including anti-roll load transfer.
@@ -117,6 +127,9 @@ class Wheel : public Node3D {
     /// Returns the longitudinal slip ratio (tire_speed - road_speed) / road_speed.
     /// 0 = rolling, 1 = spinning, -1 = locked.
     real_t get_slip_ratio() const { return slip_ratio; }
+    real_t get_slip_angle() const { return slip_angle; }
+    bool get_is_sliding() const { return is_sliding; }
+    bool get_abs_active() const { return abs_active; }
 
     real_t compression = 0.0;
     Vector3 collision_point;
@@ -142,8 +155,6 @@ class Wheel : public Node3D {
 
     real_t prev_longitudinal_force = 0.0;
     real_t prev_lateral_force = 0.0;
-
-    real_t skid_stop_cooldown = real_t{0.0};
 
     real_t instability_cooldown = 0.0;
     int oscillation_count = 0;

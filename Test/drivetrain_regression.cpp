@@ -9,10 +9,14 @@
 
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/engine.hpp"
+#include "godot_cpp/classes/mesh_instance3d.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
 #include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/memory.hpp"
+#include "godot_cpp/variant/packed_color_array.hpp"
+#include "godot_cpp/variant/packed_int32_array.hpp"
+#include "godot_cpp/variant/packed_vector3_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 
 #include "Drivetrain/RotationalConstraint.h"
@@ -30,6 +34,8 @@
 #include "Resources/vehicle_engine_data.h"
 #include "axle.h"
 #include "SteeringRack.h"
+#include "TireSkid.h"
+#include "VehicleTelemetry.h"
 #include "vehicle.h"
 #include "vehicle_setup_validation.h"
 #include "wheel.h"
@@ -120,6 +126,21 @@ Wheel *make_combined_grip_wheel(const Ref<TireData> &tire) {
     wheel->set_normal_force(real_t{10.0});
     wheel->tire_force = Vector3();
     return wheel;
+}
+
+SkidContactSample make_skid_sample(real_t longitudinal_force,
+                                   real_t longitudinal_slip,
+                                   real_t lateral_force = real_t{0.0},
+                                   real_t lateral_slip = real_t{0.0}) {
+    SkidContactSample sample;
+    sample.contact_normal = Vector3(0.0, 1.0, 0.0);
+    sample.tire_direction = Vector3(0.0, 0.0, 1.0);
+    sample.longitudinal_force = longitudinal_force;
+    sample.longitudinal_slip_velocity = longitudinal_slip;
+    sample.lateral_force = lateral_force;
+    sample.lateral_slip_velocity = lateral_slip;
+    sample.normal_load = real_t{1000.0};
+    return sample;
 }
 
 Ref<DifferentialData> make_differential_data(
@@ -1177,6 +1198,212 @@ void test_tire_combined_grip(TestState &state) {
                      std::abs(p4_force.z) > std::abs(p2_force.z),
                  "Wheel combined-grip p>2 retains more simultaneous force and copies exponent");
     memdelete(p4_wheel);
+
+    Ref<TireData> grip_tire = make_grip_tire(real_t{2.0});
+    Wheel *full_grip = make_combined_grip_wheel(grip_tire);
+    Wheel *half_grip = make_combined_grip_wheel(grip_tire);
+    Wheel *zero_grip = make_combined_grip_wheel(grip_tire);
+    half_grip->set_grip_multiplier(real_t{0.5});
+    zero_grip->set_grip_multiplier(real_t{-1.0});
+    full_grip->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
+                          real_t{0.1}, real_t{0.0}, false);
+    half_grip->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
+                          real_t{0.1}, real_t{0.0}, false);
+    zero_grip->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
+                          real_t{0.1}, real_t{0.0}, false);
+    state.expect(near(half_grip->tire_force.length(),
+                      full_grip->tire_force.length() * real_t{0.5}) &&
+                         near(zero_grip->get_grip_multiplier(), real_t{0.0}) &&
+                         near(zero_grip->tire_force.length(), real_t{0.0}),
+                 "Wheel grip multiplier proportionally scales force and supports zero grip");
+    memdelete(full_grip);
+    memdelete(half_grip);
+    memdelete(zero_grip);
+}
+
+void test_skid_marks(TestState &state) {
+    TireSkid *ordinary = memnew(TireSkid);
+    ordinary->submit_sample(make_skid_sample(real_t{1000.0}, real_t{0.0}),
+                            real_t{0.02});
+    state.expect(ordinary->get_buffer().size() == 0,
+                 "Skid force without dissipative slip produces no mark");
+    memdelete(ordinary);
+
+    TireSkid *normal_transients = memnew(TireSkid);
+    normal_transients->submit_sample(
+            make_skid_sample(real_t{1000.0}, real_t{1.0}), real_t{0.02});
+    normal_transients->submit_sample(
+            make_skid_sample(real_t{0.0}, real_t{0.0}, real_t{1000.0}, real_t{1.0}),
+            real_t{0.02});
+    normal_transients->submit_sample(
+            make_skid_sample(real_t{700.0}, real_t{1.0}, real_t{700.0}, real_t{1.0}),
+            real_t{0.02});
+    state.expect(normal_transients->get_buffer().size() == 0,
+                 "Skid onset rejects shift transients and ordinary turning scrub");
+    memdelete(normal_transients);
+
+    TireSkid *independent_modes = memnew(TireSkid);
+    independent_modes->submit_sample(
+            make_skid_sample(real_t{-1000.0}, real_t{-3.0}), real_t{0.02});
+    state.expect(independent_modes->get_buffer().size() == 2,
+                 "Skid braking slip independently starts a mark");
+    independent_modes->stop_skid();
+    SkidContactSample lateral =
+            make_skid_sample(real_t{0.0}, real_t{0.0}, real_t{1000.0}, real_t{3.0});
+    lateral.contact_position.z = real_t{0.2};
+    independent_modes->submit_sample(lateral, real_t{0.02});
+    state.expect(independent_modes->get_buffer().size() == 4 &&
+                         !independent_modes->get_buffer().section_at(2).connected_to_previous,
+                 "Skid lateral slip independently starts a disconnected mark");
+    memdelete(independent_modes);
+
+    TireSkid *stationary = memnew(TireSkid);
+    SkidContactSample burnout = make_skid_sample(real_t{1000.0}, real_t{3.0});
+    stationary->submit_sample(burnout, real_t{0.02});
+    const real_t initial_patch_intensity = stationary->get_buffer().section_at(1).intensity;
+    for (int i = 0; i < 20; ++i)
+        stationary->submit_sample(burnout, real_t{0.02});
+    state.expect(stationary->get_buffer().size() == 2 &&
+                         stationary->get_buffer().section_at(1).intensity >
+                                 initial_patch_intensity,
+                 "Stationary burnout reuses and darkens one short patch");
+    memdelete(stationary);
+
+    TireSkid *moving = memnew(TireSkid);
+    SkidContactSample moving_sample = make_skid_sample(real_t{1000.0}, real_t{3.0});
+    moving->submit_sample(moving_sample, real_t{0.02});
+    moving_sample.ground_velocity = Vector3(0.0, 0.0, 1.0);
+    moving_sample.contact_position.z = real_t{0.05};
+    moving->submit_sample(moving_sample, real_t{0.02});
+    moving_sample.contact_position.z = real_t{0.10};
+    moving->submit_sample(moving_sample, real_t{0.02});
+    state.expect(moving->get_buffer().size() == 3 &&
+                         near(moving->get_buffer().section_at(2).center.z,
+                              real_t{0.10}),
+                 "Moving skid appends cross-sections at 0.10 metre spacing");
+    memdelete(moving);
+
+    TireSkid *breaks = memnew(TireSkid);
+    SkidContactSample active = make_skid_sample(real_t{1000.0}, real_t{3.0});
+    breaks->submit_sample(active, real_t{0.02});
+    breaks->stop_skid();
+    active.contact_position.z = real_t{0.2};
+    breaks->submit_sample(active, real_t{0.02});
+    SkidContactSample released = active;
+    released.longitudinal_force = real_t{0.0};
+    released.longitudinal_slip_velocity = real_t{0.0};
+    breaks->submit_sample(released, real_t{0.13});
+    active.contact_position.z = real_t{0.4};
+    breaks->submit_sample(active, real_t{0.02});
+    active.contact_position.z = real_t{3.0};
+    breaks->submit_sample(active, real_t{0.02});
+    state.expect(breaks->get_buffer().size() == 8 &&
+                         !breaks->get_buffer().section_at(2).connected_to_previous &&
+                         !breaks->get_buffer().section_at(4).connected_to_previous &&
+                         !breaks->get_buffer().section_at(6).connected_to_previous,
+                 "Skid contact loss, release timeout, and teleport create segment breaks");
+    memdelete(breaks);
+
+    SkidMarkBuffer ring;
+    for (std::size_t i = 0; i < SkidMarkBuffer::CAPACITY + 2; ++i) {
+        SkidMarkSection section;
+        section.center.x = static_cast<real_t>(i);
+        section.connected_to_previous = true;
+        ring.push(section);
+    }
+    state.expect(ring.size() == SkidMarkBuffer::CAPACITY &&
+                         near(ring.section_at(0).center.x, real_t{2.0}) &&
+                         !ring.section_at(0).connected_to_previous &&
+                         near(ring.section_at(ring.size() - 1).center.x,
+                              real_t{2049.0}),
+                 "Skid ring deterministically replaces the oldest cross-section");
+
+    TireSkid *rendered = memnew(TireSkid);
+    rendered->_ready();
+    SkidContactSample half_intensity =
+            make_skid_sample(real_t{1000.0}, real_t{4.0});
+    rendered->submit_sample(half_intensity, real_t{0.02});
+    rendered->_process(0.0);
+    rendered->_process(0.0);
+    rendered->_process(0.0);
+    MeshInstance3D *mesh_instance = Object::cast_to<MeshInstance3D>(
+            rendered->get_node_or_null(NodePath("SkidMesh")));
+    bool mesh_matches = false;
+    if (mesh_instance != nullptr && mesh_instance->get_mesh().is_valid() &&
+        mesh_instance->get_mesh()->get_surface_count() == 1) {
+        const Array arrays = mesh_instance->get_mesh()->surface_get_arrays(0);
+        const PackedVector3Array vertices = arrays[Mesh::ARRAY_VERTEX];
+        const PackedColorArray colors = arrays[Mesh::ARRAY_COLOR];
+        const PackedInt32Array indices = arrays[Mesh::ARRAY_INDEX];
+        mesh_matches = vertices.size() == 4 && colors.size() == 4 &&
+                       indices.size() == 6 &&
+                       near(vertices[0].distance_to(vertices[1]), real_t{0.15}) &&
+                       near(colors[0].a, real_t{0.5}, real_t{1.0 / 255.0});
+        if (!mesh_matches) {
+            UtilityFunctions::printerr(
+                    "[drivetrain-regression] skid mesh detail: vertices=", vertices.size(),
+                    " colors=", colors.size(), " indices=", indices.size(),
+                    " width=", vertices.size() >= 2
+                            ? vertices[0].distance_to(vertices[1])
+                            : real_t{-1.0},
+                    " alpha=", colors.size() >= 1 ? colors[0].a : real_t{-1.0});
+        }
+    }
+    state.expect(mesh_matches,
+                 "Skid mesh emits one tire-width quad with vertex-alpha intensity");
+    memdelete(rendered);
+
+    Ref<TireData> falling_tire = make_grip_tire(real_t{2.0});
+    Ref<Curve> falling_curve = memnew(Curve);
+    falling_curve->add_point(Vector2(0.0, 0.0));
+    falling_curve->add_point(Vector2(1.0, 1.0));
+    falling_curve->add_point(Vector2(2.0, 0.4));
+    falling_tire->set_forward_friction_curve(falling_curve);
+    Wheel *extreme_wheel = memnew(Wheel);
+    extreme_wheel->set_suspension(real_t{1.0}, real_t{1.0}, real_t{1.0},
+                                  real_t{1000.0});
+    extreme_wheel->set_tire(falling_tire);
+    extreme_wheel->on_ground = true;
+    extreme_wheel->collision_normal = Vector3(0.0, 1.0, 0.0);
+    extreme_wheel->forward_vector = Vector3(0.0, 0.0, 1.0);
+    extreme_wheel->right_vector = Vector3(1.0, 0.0, 0.0);
+    extreme_wheel->set_normal_force(real_t{1000.0});
+    set_wheel_angular_velocity(extreme_wheel, real_t{30.0});
+    extreme_wheel->solve_tire(Vector3(), Vector3(), Vector3(), real_t{0.1},
+                              real_t{0.0}, false);
+    state.expect(extreme_wheel->skid != nullptr &&
+                         extreme_wheel->skid->get_buffer().size() == 2,
+                 "Wheel extreme slip marks below the tire curve peak");
+    memdelete(extreme_wheel);
+
+    Turbo high_power_turbo;
+    high_power_turbo.configure(make_turbo_data(real_t{2.0}, real_t{3000.0},
+                                                real_t{0.05}));
+    for (int i = 0; i < 20; ++i)
+        high_power_turbo.update(real_t{0.02}, real_t{3000.0}, real_t{1.0});
+
+    Wheel *powered_wheel = memnew(Wheel);
+    powered_wheel->set_suspension(real_t{1.0}, real_t{1.0}, real_t{1.0},
+                                  real_t{1000.0});
+    powered_wheel->set_tire(falling_tire);
+    powered_wheel->on_ground = true;
+    powered_wheel->collision_normal = Vector3(0.0, 1.0, 0.0);
+    powered_wheel->forward_vector = Vector3(0.0, 0.0, 1.0);
+    powered_wheel->right_vector = Vector3(1.0, 0.0, 0.0);
+    powered_wheel->set_normal_force(real_t{1000.0});
+    for (int i = 0; i < 12; ++i) {
+        powered_wheel->collision_point.z = static_cast<real_t>(i) * real_t{0.1};
+        powered_wheel->add_drive_torque(real_t{1000.0} *
+                                        high_power_turbo.get_air_charge_ratio());
+        powered_wheel->integrate_rotation(real_t{0.02});
+        powered_wheel->tire_force = Vector3();
+        powered_wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, 1.0), Vector3(),
+                                  real_t{0.02}, real_t{0.0}, false);
+    }
+    state.expect(high_power_turbo.get_boost() > real_t{1.0} &&
+                         powered_wheel->skid->get_buffer().size() >= 8,
+                 "Boosted wheel torque sustains high-slip skid sections");
+    memdelete(powered_wheel);
 }
 
 void test_steering_sat(TestState &state) {
@@ -1322,6 +1549,54 @@ void test_vehicle_center_of_mass_marker(TestState &state) {
                  "Vehicle null marker preserves manual custom COM");
     scene_root->remove_child(manual_vehicle);
     memdelete(manual_vehicle);
+}
+
+void test_vehicle_tire_telemetry(TestState &state) {
+    SceneTree *scene_tree = Object::cast_to<SceneTree>(
+            Engine::get_singleton()->get_main_loop());
+    Window *scene_root = scene_tree != nullptr ? scene_tree->get_root() : nullptr;
+    state.expect(scene_root != nullptr,
+                 "Vehicle tire telemetry fixture has a live SceneTree root");
+    if (scene_root == nullptr)
+        return;
+
+    Vehicle *vehicle = memnew(Vehicle);
+    vehicle->set_config(make_valid_config());
+    vehicle->set_mass(real_t{1200.0});
+    vehicle->add_child(make_unready_axle(real_t{1.0}));
+    VehicleTelemetry *telemetry = memnew(VehicleTelemetry);
+    vehicle->add_child(telemetry);
+    scene_root->add_child(vehicle);
+    telemetry->_process(0.0);
+
+    Wheel *right_tire = vehicle->get_wheel_views()[0]->get_wheels()[1];
+    state.expect(telemetry->get_wheel_rpms().size() == 2 &&
+                         telemetry->get_tire_forces().size() == 2 &&
+                         near(telemetry->get_wheel_rpm(right_tire), real_t{0.0}) &&
+                         telemetry->get_tire_force(right_tire) == right_tire->get_tire_force(),
+                 "Vehicle telemetry exposes bulk arrays and wheel-reference accessors");
+    state.expect(near(telemetry->get_wheel_rpm(nullptr), real_t{0.0}) &&
+                         telemetry->get_tire_force(nullptr) == Vector3() &&
+                         telemetry->get_tire_telemetry(nullptr).is_empty(),
+                 "Vehicle telemetry handles a null wheel reference at the public boundary");
+
+    right_tire->set_grip_multiplier(real_t{0.6});
+    const Dictionary tire_data = telemetry->get_tire_telemetry(right_tire);
+    state.expect(tire_data.has("wheel") && tire_data.has("wheel_rpm") &&
+                         tire_data.has("tire_force") && tire_data.has("normal_load") &&
+                         tire_data.has("slip_ratio") &&
+                         tire_data.has("slip_angle_degrees") &&
+                         tire_data.has("grounded") && tire_data.has("sliding") &&
+                         tire_data.has("abs_active") &&
+                         tire_data.has("contact_position") &&
+                         tire_data.has("contact_normal") &&
+                         tire_data.has("grip_multiplier") &&
+                         near(static_cast<real_t>(tire_data["grip_multiplier"]),
+                              real_t{0.6}),
+                 "Vehicle telemetry returns one tire's complete public runtime view");
+
+    scene_root->remove_child(vehicle);
+    memdelete(vehicle);
 }
 
 void test_setup_validation(TestState &state) {
@@ -1477,8 +1752,10 @@ bool DrivetrainRegression::run() {
     test_turbo(state);
     test_engine(state);
     test_tire_combined_grip(state);
+    test_skid_marks(state);
     test_steering_sat(state);
     test_vehicle_center_of_mass_marker(state);
+    test_vehicle_tire_telemetry(state);
     test_setup_validation(state);
     if (state.failures != 0)
         UtilityFunctions::printerr("[drivetrain-regression] ", state.failures,

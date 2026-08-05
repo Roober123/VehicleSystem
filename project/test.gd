@@ -40,7 +40,7 @@ func _process(dt: float) -> void:
 	ctrl.get_node("SpeedLabel").text = "Speed: %.1f km/h" % _telemetry.get_vehicle_speed_kph()
 
 	# Wheel angular velocities
-	var wheel_rpms = _telemetry.get_wheel_angular_velocities()
+	var wheel_rpms = _telemetry.get_wheel_rpms()
 	for i in range(wheel_rpms.size()):
 		var label = ctrl.get_node_or_null("Wheel%dRPMLabel" % (i + 1))
 		if label:
