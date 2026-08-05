@@ -3,15 +3,17 @@
 #include <vector>
 
 #include "godot_cpp/core/defs.hpp"
+#include "godot_cpp/variant/string.hpp"
 
-#include "Drivetrain/ClutchConstraint.h"
 #include "Drivetrain/Gearbox.h"
-#include "Drivetrain/ShaftWheelsCouplingConstraint.h"
+#include "Drivetrain/RotationalNetwork.h"
 #include "Drivetrain/Turbo.h"
 #include "Drivetrain/VehicleEngine.h"
 #include "Resources/vehicle_config.h"
 
 namespace godot {
+
+class Axle;
 
 /// Value-owned drivetrain composition and its frame/substep state.
 ///
@@ -21,16 +23,15 @@ namespace godot {
 class VehicleDrivetrain {
     VehicleEngine engine;
     Turbo turbo;
-    ClutchConstraint clutch;
     Gearbox gearbox;
-    ShaftWheelsCouplingConstraint shaft_wheels_coupling;
+    RotationalNetwork network;
     RotationalBody drive_shaft;
 
 public:
     VehicleDrivetrain();
 
-    void setup(const Ref<VehicleConfig> &config,
-               const std::vector<Axle *> &setup_axles);
+    bool setup(const Ref<VehicleConfig> &config,
+               const std::vector<Axle *> &setup_axles, String &error);
 
     const VehicleEngine &get_engine() const { return engine; }
     const Gearbox &get_gearbox() const { return gearbox; }
@@ -47,23 +48,13 @@ public:
     }
     void accumulate_engine_torque(real_t dt) { engine.accumulate_torque(dt); }
 
-    real_t get_aggregate_inertia() const {
-        return shaft_wheels_coupling.get_aggregate_inertia();
+    void solve_network(real_t dt) {
+        network.solve(dt, gearbox.get_effective_ratio(),
+                gearbox.get_clutch_engagement(), gearbox.get_clutch_capacity());
     }
-    real_t get_predicted_aggregate_angular_velocity(real_t dt) const {
-        return shaft_wheels_coupling.get_predicted_aggregate_angular_velocity(dt);
+    const ClutchTelemetry &get_clutch_telemetry() const {
+        return network.get_clutch_telemetry();
     }
-    void solve_clutch(real_t dt) {
-        const ClutchSolveInput input{
-            gearbox.get_effective_ratio(),
-            gearbox.get_clutch_engagement(),
-            gearbox.get_clutch_capacity(),
-            get_aggregate_inertia(),
-            get_predicted_aggregate_angular_velocity(dt),
-            engine.get_pending_torque()};
-        clutch.solve(dt, input);
-    }
-    void solve_coupling(real_t dt) { shaft_wheels_coupling.solve(dt); }
     void integrate_bodies(real_t dt) {
         engine.integrate(dt);
         drive_shaft.integrate(dt);

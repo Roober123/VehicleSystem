@@ -28,10 +28,6 @@ void VehicleConfig::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "turbo_data", PROPERTY_HINT_RESOURCE_TYPE, "TurboData"),
                  "set_turbo_data", "get_turbo_data");
 
-    ClassDB::bind_method(D_METHOD("set_center_differential_data", "data"), &VehicleConfig::set_center_differential_data);
-    ClassDB::bind_method(D_METHOD("get_center_differential_data"), &VehicleConfig::get_center_differential_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "center_differential_data", PROPERTY_HINT_RESOURCE_TYPE, "DifferentialData"),
-                 "set_center_differential_data", "get_center_differential_data");
 }
 
 } // namespace godot

@@ -80,7 +80,12 @@ void Vehicle::_ready() {
 
     running_gear.setup(setup_axles, get_mass(), config->get_suspension_data(),
                        config->get_aero_data());
-    drivetrain.setup(config, running_gear.get_axles());
+    String drivetrain_error;
+    if (!drivetrain.setup(config, running_gear.get_axles(), drivetrain_error)) {
+        UtilityFunctions::printerr(String("Vehicle drivetrain setup failed: ") +
+                                    drivetrain_error);
+        return;
+    }
 
     initialized = true;
     emit_signal("vehicle_ready");
@@ -108,10 +113,10 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
     if (drivetrain.is_reverse()) {
         drivetrain.set_throttle(brake_input);
     } else {
-        const real_t throttle = tcs_enabled
-            ? running_gear.apply_traction_control(throttle_input, get_linear_velocity().length())
-            : throttle_input;
-        drivetrain.set_throttle(throttle);
+        real_t modified_throttle = throttle_input;
+        if (tcs_enabled)
+            modified_throttle = running_gear.apply_traction_control(throttle_input, get_linear_velocity().length());
+        drivetrain.set_throttle(modified_throttle);
     }
 
     const real_t dt = state->get_step();
@@ -134,8 +139,7 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
             com_global, linear_velocity, angular_velocity, sub_dt,
             steer_input, wheel_brake, speed_kph, abs_enabled);
 
-        drivetrain.solve_clutch(sub_dt);
-        drivetrain.solve_coupling(sub_dt);
+        drivetrain.solve_network(sub_dt);
 
         drivetrain.integrate_bodies(sub_dt);
         running_gear.integrate_wheels(sub_dt);
@@ -209,6 +213,16 @@ VehicleTelemetrySnapshot Vehicle::get_telemetry_snapshot() const {
     snapshot.engine_throttle = throttle_input;
     snapshot.driveshaft_rpm = drive_shaft.get_angular_velocity() * ang_to_rpm;
     snapshot.clutch_engagement = gearbox.get_clutch_engagement();
+    const ClutchTelemetry &clutch = drivetrain.get_clutch_telemetry();
+    if (clutch.present) {
+        snapshot.clutch_requested_torque =
+                clutch.requested_engine_torque;
+        snapshot.clutch_transmitted_torque =
+                clutch.transmitted_torque;
+        snapshot.clutch_output_torque = clutch.output_torque;
+        snapshot.clutch_slip = clutch.slip;
+        snapshot.clutch_slipping = clutch.slipping;
+    }
     snapshot.current_gear = gearbox.get_current_gear();
     snapshot.gear_ratio = gearbox.get_effective_ratio();
     snapshot.vehicle_speed_kph = get_speed_kph();

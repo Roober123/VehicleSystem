@@ -8,7 +8,6 @@
 #include "Resources/turbo_data.h"
 #include "Resources/vehicle_aerodynamics_data.h"
 #include "Resources/vehicle_engine_data.h"
-#include "Resources/differential_data.h"
 
 namespace godot {
 
@@ -23,7 +22,6 @@ class VehicleConfig : public Resource {
     Ref<SuspensionData> suspension_data;
     Ref<VehicleAerodynamicsData> aero_data;
     Ref<TurboData> turbo_data;
-    Ref<DifferentialData> center_differential_data;
 
 protected:
     static void _bind_methods();
@@ -47,8 +45,6 @@ public:
     void set_turbo_data(const Ref<TurboData> &value) { turbo_data = value; }
     Ref<TurboData> get_turbo_data() const { return turbo_data; }
 
-    void set_center_differential_data(const Ref<DifferentialData> &value) { center_differential_data = value; }
-    Ref<DifferentialData> get_center_differential_data() const { return center_differential_data; }
 };
 
 } // namespace godot

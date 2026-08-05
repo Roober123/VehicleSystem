@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="DifferentialData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Configuration for an axle or center differential.
+		Configuration for a driven axle's wheel differential.
 	</brief_description>
 	<description>
-		DifferentialData selects an [code]OPEN[/code], [code]LIMITED_SLIP[/code], or [code]LOCKED[/code] relative-motion policy. Axle differentials operate between two wheel outputs; a center differential operates between two driven-axle carriers. In [code]LIMITED_SLIP[/code], lock capacity is [code]min(max_lock_torque, preload_torque + active_lock_ratio * abs(transmitted_torque) + slip_sensitive_gain * abs(relative_speed))[/code]. The active ratio is [member power_lock_ratio] when transmitted torque times carrier speed is non-negative (power) and [member coast_lock_ratio] otherwise (coast). All lock fields are inactive in [code]OPEN[/code] and [code]LOCKED[/code]. Solver snapshots are copied at setup and the solve path performs no dynamic allocation.
+		DifferentialData selects an [code]OPEN[/code], [code]LIMITED_SLIP[/code], or [code]LOCKED[/code] policy for relative motion between an axle's two wheel bodies. The axle's positive [member Axle.drive_share] is a separate value: direct [code]RotationalNetwork[/code] setup copies each policy into [code]DifferentialSettings[/code] and normalizes positive shares across one through eight driven axles as flat weights, with no inter-axle differential. At each solve the carrier velocity is computed directly from predicted left/right wheel velocities. In [code]OPEN[/code] mode no relative row is constructed; [code]LOCKED[/code] mode constructs a transient row with unbounded capacity. In [code]LIMITED_SLIP[/code], lock capacity is [code]min(max_lock_torque, preload_torque + active_lock_ratio * abs(transmitted_torque) + slip_sensitive_gain * abs(relative_slip))[/code]. The active ratio is [member power_lock_ratio] when transmitted torque times carrier velocity is non-negative (power) and [member coast_lock_ratio] otherwise (coast). Settings are copied into fixed setup storage; runtime solving performs no dynamic allocation.
 	</description>
 	<tutorials>
 	</tutorials>

@@ -8,8 +8,7 @@
 namespace godot {
 
 /// Gear selection and clutch phase state. Gearbox owns all mutable running-
-/// gear state; ClutchConstraint consumes only the immutable solve snapshot it
-/// produces for a substep.
+/// gear state consumed by the compiled rotational network.
 class Gearbox {
     VehicleEngine *engine = nullptr;
     RotationalBody *driveshaft = nullptr;

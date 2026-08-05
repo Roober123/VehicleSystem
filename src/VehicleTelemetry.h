@@ -37,6 +37,11 @@ public:
     real_t get_engine_throttle() const { return snapshot.engine_throttle; }
     real_t get_driveshaft_rpm() const { return snapshot.driveshaft_rpm; }
     real_t get_clutch_engagement() const { return snapshot.clutch_engagement; }
+    real_t get_clutch_requested_torque() const { return snapshot.clutch_requested_torque; }
+    real_t get_clutch_transmitted_torque() const { return snapshot.clutch_transmitted_torque; }
+    real_t get_clutch_output_torque() const { return snapshot.clutch_output_torque; }
+    real_t get_clutch_slip() const { return snapshot.clutch_slip; }
+    bool get_clutch_slipping() const { return snapshot.clutch_slipping; }
     int get_current_gear() const { return snapshot.current_gear; }
     real_t get_gear_ratio() const { return snapshot.gear_ratio; }
     real_t get_vehicle_speed_kph() const { return snapshot.vehicle_speed_kph; }

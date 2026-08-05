@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="Axle" inherits="Node3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Axle grouping node for exactly two vehicle wheels and an optional differential.
+		Axle grouping node for exactly two vehicle wheels and an optional driven-wheel differential.
 	</brief_description>
 	<description>
-		Axle groups its child [Wheel] nodes and owns steering, suspension/tire phase access, anti-roll force, and differential setup. Vehicle setup requires exactly two distinct wheels and [TireData] on every axle. Positive [member drive_share] values identify driven axles; up to two driven axles are supported and shares are normalized for shaft routing. Driven axles require [DifferentialData]. A steering-rack resource is required only when [member is_steerable] is true. Differential setup requires the two wheel rotational inertias to match within the solver tolerance.
+		Axle groups its child [Wheel] nodes and stores steering, suspension/tire phase access, anti-roll force, and differential data. Vehicle setup requires exactly two distinct wheels and [TireData] on every axle. Positive [member drive_share] values identify driven axles; one through eight driven axles are supported and shares are normalized as flat weights with no inter-axle differential. Each driven axle is copied into a direct [code]DrivenAxle[/code] value with its two wheel bodies and [code]DifferentialSettings[/code] copied from [DifferentialData]. Open leaves relative motion unconstrained; Locked and Limited Slip construct transient left/right rows during the solve. Wheel rotational inertias may be unequal as long as each is finite and positive. A steering-rack resource is required only when [member is_steerable] is true.
 	</description>
 	<tutorials>
 	</tutorials>

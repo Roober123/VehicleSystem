@@ -4,7 +4,7 @@
 		Telemetry node that reads and exposes vehicle drivetrain data for UI or debugging.
 	</brief_description>
 	<description>
-		VehicleTelemetry is a [Node] that reads an immutable [VehicleTelemetrySnapshot] value from a [Vehicle] and exposes it through readable accessors. It caches the target's wheel topology once it is available, then reuses bounded arrays for per-wheel values. It can auto-detect its target by checking the parent or sibling nodes, or assign one manually via [method set_target].
+		VehicleTelemetry is a [Node] that reads an immutable [VehicleTelemetrySnapshot] value from a [Vehicle] and exposes it through readable accessors. It caches the target's wheel layout once it is available, then reuses bounded arrays for per-wheel values. Clutch engagement, requested torque, transmitted torque, output torque, signed slip, and slipping state are flattened scalar snapshot fields. It can auto-detect its target by checking the parent or sibling nodes, or assign one manually via [method set_target].
 
 		Use this node to display real-time data like RPM, speed, gear, and clutch engagement in a HUD or debug overlay.
 	</description>
@@ -52,6 +52,36 @@
 			<return type="float" />
 			<description>
 				Returns the clutch engagement level (0.0 = fully disengaged, 1.0 = fully locked).
+			</description>
+		</method>
+		<method name="get_clutch_requested_torque" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the requested engine-side clutch torque in the engine-to-output sign convention: positive requests torque from the engine toward the driveshaft, negative requests the opposite. Returns 0.0 in neutral.
+			</description>
+		</method>
+		<method name="get_clutch_transmitted_torque" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the applied clutch torque on the engine-to-output sign convention. Positive values transmit torque from engine to output; negative values transmit torque from output to engine. Returns 0.0 in neutral.
+			</description>
+		</method>
+		<method name="get_clutch_output_torque" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns transmitted clutch torque after the signed selected gear ratio, as torque delivered into the driveshaft and driven axles. Reverse ratios therefore reverse the sign. Returns 0.0 in neutral.
+			</description>
+		</method>
+		<method name="get_clutch_slip" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns signed clutch-row slip in rad/s: engine angular velocity minus signed gear ratio times driveshaft angular velocity. Returns 0.0 in neutral.
+			</description>
+		</method>
+		<method name="get_clutch_slipping" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns whether the clutch solve reports slip (the clutch row is not connected). Returns false in neutral.
 			</description>
 		</method>
 		<method name="get_current_gear" qualifiers="const">

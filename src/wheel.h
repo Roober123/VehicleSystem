@@ -13,7 +13,6 @@
 namespace godot {
 
 class Axle;
-class ShaftWheelsCouplingConstraint;
 
 class Wheel : public Node3D {
     GDCLASS(Wheel, Node3D);
@@ -42,7 +41,6 @@ class Wheel : public Node3D {
     RotationalBody body;
 
     friend class Axle;
-    friend class ShaftWheelsCouplingConstraint;
 
     void add_physics();
     void _compute_sat(real_t lateral_force);
@@ -103,6 +101,8 @@ class Wheel : public Node3D {
     void set_normal_force(real_t force);
     /// Returns the wheel's angular velocity in rad/s.
     real_t get_angular_velocity() const { return body.get_angular_velocity(); }
+    /// Setup-only access for compiling the fixed rotational network.
+    RotationalBody *get_rotational_body_for_setup() { return &body; }
     /// Returns the average tire force (world-space) applied last frame.
     Vector3 get_tire_force() const { return cached_tire_force; }
     /// Returns the world-space position where the wheel contacts the ground.

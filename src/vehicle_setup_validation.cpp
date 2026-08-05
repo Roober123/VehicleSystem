@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "Drivetrain/RotationalNetwork.h"
 #include "axle.h"
 
 namespace godot {
@@ -112,10 +113,8 @@ bool VehicleSetupValidation::validate(const Ref<VehicleConfig> &config,
 
     if (driven_axle_count == 0)
         add_error(errors, "at least one driven axle is required (drive_share > 0)");
-    else if (driven_axle_count > 2)
-        add_error(errors, "at most two driven axles are supported");
-    else if (driven_axle_count == 2 && config->get_center_differential_data().is_null())
-        add_error(errors, "two driven axles require center_differential_data");
+    else if (driven_axle_count > RotationalNetwork::MAX_AXLES)
+        add_error(errors, "at most eight driven axles are supported");
 
     error = join_errors(errors);
     return errors.empty();

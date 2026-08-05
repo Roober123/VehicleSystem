@@ -28,7 +28,7 @@ point_count = 4
 [sub_resource type="VehicleEngineData" id="VehicleEngineData_l7kk7"]
 torque_curve = SubResource("Curve_n51mc")
 inertia = 0.6
-max_torque = 200.0
+max_torque = 706.0
 engine_braking = 0.3
 
 [sub_resource type="GearboxData" id="GearboxData_c52e2"]

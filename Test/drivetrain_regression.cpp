@@ -1,5 +1,6 @@
 #include "drivetrain_regression.h"
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -9,10 +10,9 @@
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 
-#include "Drivetrain/ClutchConstraint.h"
-#include "Drivetrain/differential_solver.h"
+#include "Drivetrain/RotationalConstraint.h"
+#include "Drivetrain/RotationalNetwork.h"
 #include "Drivetrain/Gearbox.h"
-#include "Drivetrain/ShaftWheelsCouplingConstraint.h"
 #include "Drivetrain/VehicleEngine.h"
 #include "Resources/gearbox_data.h"
 #include "Resources/differential_data.h"
@@ -165,63 +165,649 @@ void test_rotational_body(TestState &state) {
                  "RotationalBody integration clears pending torque");
 }
 
-void test_clutch_constraint(TestState &state) {
-    struct Case { real_t ratio; real_t engine_omega; real_t output_omega; };
-    const Case cases[] = {
-        {real_t{2.0}, real_t{6.0}, real_t{2.0}},
-        {real_t{-2.0}, real_t{-6.0}, real_t{2.0}},
+void test_rotational_constraint(TestState &state) {
+    // Scalar hard row: equalize two bodies while conserving angular momentum
+    // and dissipating (never adding) kinetic energy.
+    RotationalBody first;
+    RotationalBody second;
+    first.set_inertia(real_t{2.0});
+    second.set_inertia(real_t{3.0});
+    first.set_angular_velocity(real_t{4.0});
+    second.set_angular_velocity(real_t{-1.0});
+    VelocityConstraint row;
+    row.add_term(first, real_t{1.0});
+    row.add_term(second, real_t{-1.0});
+    const real_t initial_momentum = first.get_inertia() * first.get_angular_velocity() +
+            second.get_inertia() * second.get_angular_velocity();
+    const real_t initial_energy = real_t{0.5} * first.get_inertia() *
+            first.get_angular_velocity() * first.get_angular_velocity() +
+            real_t{0.5} * second.get_inertia() * second.get_angular_velocity() *
+            second.get_angular_velocity();
+    ConstraintSolver hard_solver(real_t{0.1});
+    const ConstraintSolution hard = hard_solver.solve(row);
+    const bool hard_committed = hard_solver.commit();
+    first.integrate(real_t{0.1});
+    second.integrate(real_t{0.1});
+    const real_t final_momentum = first.get_inertia() * first.get_angular_velocity() +
+            second.get_inertia() * second.get_angular_velocity();
+    const real_t final_energy = real_t{0.5} * first.get_inertia() *
+            first.get_angular_velocity() * first.get_angular_velocity() +
+            real_t{0.5} * second.get_inertia() * second.get_angular_velocity() *
+            second.get_angular_velocity();
+    state.expect(hard.valid && hard_committed && !hard.slipping &&
+                         near(hard.requested_torque, real_t{-60.0}) &&
+                         near(hard.applied_torque, real_t{-60.0}) &&
+                         near(hard.slip, real_t{0.0}) &&
+                         near(first.get_angular_velocity(), real_t{1.0}) &&
+                         near(second.get_angular_velocity(), real_t{1.0}) &&
+                         near(final_momentum, initial_momentum) &&
+                         final_energy <= initial_energy + kEpsilon,
+                     "RotationalConstraint scalar conservation and energy");
+
+    // Capacity is a torque magnitude; the impulse bound is capacity * dt.
+    RotationalBody capacity_left;
+    RotationalBody capacity_right;
+    capacity_left.set_inertia(real_t{1.0});
+    capacity_right.set_inertia(real_t{1.0});
+    capacity_left.set_angular_velocity(real_t{4.0});
+    VelocityConstraint capacity_row;
+    capacity_row.add_term(capacity_left, real_t{1.0});
+    capacity_row.add_term(capacity_right, real_t{-1.0});
+    ConstraintSolver capacity_solver(real_t{0.1});
+    const ConstraintSolution limited =
+            capacity_solver.solve(capacity_row, real_t{5.0});
+    const bool capacity_committed = capacity_solver.commit();
+    state.expect(limited.valid && capacity_committed && limited.slipping &&
+                         near(limited.requested_torque, real_t{-20.0}) &&
+                         near(limited.applied_torque, real_t{-5.0}) &&
+                         near(limited.slip, real_t{3.0}) &&
+                         near(capacity_left.get_pending_torque(), real_t{-5.0}) &&
+                         near(capacity_right.get_pending_torque(), real_t{5.0}),
+                     "RotationalConstraint capacity clamp and slip result");
+
+    // Every term is validated before mutation.  A non-finite row leaves all
+    // existing pending torques untouched.
+    RotationalBody invalid_body;
+    invalid_body.set_inertia(real_t{1.0});
+    invalid_body.set_angular_velocity(real_t{2.0});
+    invalid_body.add_torque(real_t{7.0});
+    VelocityConstraint invalid_row;
+    state.expect(!invalid_row.add_term(
+                         invalid_body,
+                         std::numeric_limits<real_t>::quiet_NaN()),
+                 "VelocityConstraint rejects non-finite coefficient");
+    ConstraintSolver invalid_solver(real_t{0.1});
+    const ConstraintSolution invalid = invalid_solver.solve(invalid_row);
+    state.expect(!invalid.valid && near(invalid_body.get_pending_torque(), real_t{7.0}),
+                 "RotationalConstraint invalid input has no partial mutation");
+
+    // Rows and solver transactions are fixed-capacity.  Fill a row to its 18-term
+    // bound, then verify the 19th term is rejected without changing the row.
+    std::array<RotationalBody, MAX_CONSTRAINT_TERMS + 1> bounded_bodies{};
+    VelocityConstraint bounded_row;
+    bool all_terms_added = true;
+    for (std::size_t i = 0; i < MAX_CONSTRAINT_TERMS; ++i)
+        all_terms_added = all_terms_added &&
+                bounded_row.add_term(bounded_bodies[i], real_t{1.0});
+    const bool over_bound_rejected =
+            !bounded_row.add_term(bounded_bodies[MAX_CONSTRAINT_TERMS],
+                                  real_t{1.0});
+    ConstraintSolver bounded_solver(real_t{0.1});
+    const ConstraintSolution bounded_solution = bounded_solver.solve(bounded_row);
+    const bool bounded_committed = bounded_solver.commit();
+    state.expect(all_terms_added && over_bound_rejected &&
+                         bounded_row.term_count == MAX_CONSTRAINT_TERMS &&
+                         bounded_solution.valid && bounded_committed,
+                 "RotationalConstraint enforces fixed row and batch bounds");
+
+    // Coupled analytic rows.  The primary row is hard; the clutch row is
+    // solved exactly when unbounded and leaves only its bounded residual when
+    // its capacity is exhausted.
+    RotationalBody coupled_a;
+    RotationalBody coupled_b;
+    RotationalBody coupled_c;
+    coupled_a.set_angular_velocity(real_t{3.0});
+    coupled_b.set_angular_velocity(real_t{0.0});
+    coupled_c.set_angular_velocity(real_t{-2.0});
+    VelocityConstraint primary_constraint;
+    primary_constraint.add_term(coupled_a, real_t{1.0});
+    primary_constraint.add_term(coupled_b, real_t{-1.0});
+    VelocityConstraint clutch_constraint;
+    clutch_constraint.add_term(coupled_b, real_t{1.0});
+    clutch_constraint.add_term(coupled_c, real_t{-1.0});
+    ConstraintSolver analytic_solver(real_t{0.1});
+    const ClutchSolution analytic =
+            analytic_solver.solve_clutch(primary_constraint, clutch_constraint);
+    const bool analytic_committed = analytic_solver.commit();
+    coupled_a.integrate(real_t{0.1});
+    coupled_b.integrate(real_t{0.1});
+    coupled_c.integrate(real_t{0.1});
+    state.expect(analytic.valid && analytic_committed &&
+                         near(analytic.clutch_requested_torque,
+                              real_t{-70.0 / 3.0}) &&
+                         near(analytic.clutch_applied_torque,
+                              real_t{-70.0 / 3.0}) &&
+                         near(analytic.primary_applied_torque,
+                              real_t{-80.0 / 3.0}) &&
+                         near(coupled_a.get_angular_velocity(),
+                              coupled_b.get_angular_velocity()) &&
+                         near(coupled_b.get_angular_velocity(),
+                              coupled_c.get_angular_velocity()),
+                     "RotationalConstraint coupled analytic solve");
+
+    RotationalBody bounded_a;
+    RotationalBody bounded_b;
+    RotationalBody bounded_c;
+    bounded_a.set_angular_velocity(real_t{3.0});
+    bounded_c.set_angular_velocity(real_t{-2.0});
+    VelocityConstraint bounded_primary_constraint;
+    bounded_primary_constraint.add_term(bounded_a, real_t{1.0});
+    bounded_primary_constraint.add_term(bounded_b, real_t{-1.0});
+    VelocityConstraint bounded_clutch_constraint;
+    bounded_clutch_constraint.add_term(bounded_b, real_t{1.0});
+    bounded_clutch_constraint.add_term(bounded_c, real_t{-1.0});
+    ConstraintSolver bounded_solver_2(real_t{0.1});
+    const ClutchSolution bounded = bounded_solver_2.solve_clutch(
+            bounded_primary_constraint, bounded_clutch_constraint,
+            real_t{10.0});
+    const bool bounded_committed_2 = bounded_solver_2.commit();
+    bounded_a.integrate(real_t{0.1});
+    bounded_b.integrate(real_t{0.1});
+    bounded_c.integrate(real_t{0.1});
+    state.expect(bounded.valid && bounded_committed_2 && bounded.clutch_slipping &&
+                         near(bounded.clutch_applied_torque, real_t{-10.0}) &&
+                         near(bounded_a.get_angular_velocity(),
+                              bounded_b.get_angular_velocity()) &&
+                         std::abs(bounded_b.get_angular_velocity() -
+                                          bounded_c.get_angular_velocity()) >
+                                 real_t{1.0},
+                     "RotationalConstraint bounded clutch conditions primary");
+}
+
+void test_rotational_network(TestState &state) {
+    auto make_config = [](RotationalBody &left, RotationalBody &right,
+                          real_t drive_share,
+                          DifferentialData::Mode mode = DifferentialData::OPEN,
+                          real_t preload = real_t{0.0},
+                          real_t power_lock = real_t{0.0},
+                          real_t coast_lock = real_t{0.0},
+                          real_t slip_gain = real_t{0.0},
+                          real_t max_lock = real_t{100.0}) {
+        DrivenAxle config;
+        config.left = &left;
+        config.right = &right;
+        config.share = drive_share;
+        config.differential.mode = mode;
+        config.differential.preload_torque = preload;
+        config.differential.power_lock_ratio = power_lock;
+        config.differential.coast_lock_ratio = coast_lock;
+        config.differential.slip_sensitive_gain = slip_gain;
+        config.differential.max_lock_torque = max_lock;
+        return config;
     };
-    for (const Case &test : cases) {
-        RotationalBody engine;
-        RotationalBody output;
-        engine.set_inertia(real_t{1.0});
-        output.set_inertia(real_t{4.0});
-        engine.set_angular_velocity(test.engine_omega);
-        output.set_angular_velocity(test.output_omega);
-        ClutchConstraint clutch;
-        clutch.set_bodies(engine, output);
-        clutch.solve(real_t{0.1}, ClutchSolveInput{
-            test.ratio, real_t{1.0}, real_t{100.0}, real_t{4.0},
-            test.output_omega, real_t{0.0}});
-        const real_t engine_torque = engine.get_pending_torque();
-        const real_t output_torque = output.get_pending_torque();
-        engine.integrate(real_t{0.1});
-        output.integrate(real_t{0.1});
-        const real_t slip = engine.get_angular_velocity() -
-                            test.ratio * output.get_angular_velocity();
-        state.expect(std::abs(slip) <= real_t{2.0} * kEpsilon &&
-                         std::abs(engine_torque) > real_t{0.0} &&
-                         near(output_torque, -engine_torque * test.ratio),
-                     "ClutchConstraint forward/reverse synchronization");
+
+    RotationalBody engine;
+    RotationalBody shaft;
+    engine.set_inertia(real_t{1.0});
+    shaft.set_inertia(real_t{2.0});
+    std::array<RotationalBody, RotationalNetwork::MAX_WHEELS> wheels{};
+    for (std::size_t i = 0; i < wheels.size(); ++i)
+        wheels[i].set_inertia(real_t{1.0} + static_cast<real_t>(i % 3));
+
+    std::array<DrivenAxle, RotationalNetwork::MAX_AXLES>
+            configs{};
+    for (std::size_t i = 0; i < RotationalNetwork::MAX_AXLES; ++i)
+        configs[i] = make_config(wheels[2 * i], wheels[2 * i + 1],
+                                 real_t{1.0} + static_cast<real_t>(i));
+
+    RotationalNetwork network;
+    for (std::size_t count = 1; count <= RotationalNetwork::MAX_AXLES;
+         ++count) {
+        state.expect(network.configure(engine, shaft, configs, count) &&
+                             network.get_axle_count() == count,
+                     "RotationalNetwork configures one through eight axles");
     }
+    const std::size_t preserved_count = network.get_axle_count();
+    state.expect(!network.configure(engine, shaft, configs, 0) &&
+                         network.get_axle_count() == preserved_count,
+                 "RotationalNetwork rejects zero axles atomically");
+    state.expect(!network.configure(engine, shaft, configs,
+                                    RotationalNetwork::MAX_AXLES + 1) &&
+                         network.get_axle_count() == preserved_count,
+                 "RotationalNetwork rejects nine axles atomically");
 
-    RotationalBody capacity_engine;
-    RotationalBody capacity_output;
-    capacity_engine.set_inertia(real_t{1.0});
-    capacity_output.set_inertia(real_t{1.0});
-    capacity_engine.set_angular_velocity(real_t{2.0});
-    ClutchConstraint limited;
-    limited.set_bodies(capacity_engine, capacity_output);
-    limited.solve(real_t{0.1}, ClutchSolveInput{
-        real_t{1.0}, real_t{0.5}, real_t{2.0}, real_t{1.0},
-        real_t{0.0}, real_t{0.0}});
-    state.expect(std::abs(capacity_engine.get_pending_torque()) <= real_t{1.0} + kEpsilon &&
-                     near(capacity_output.get_pending_torque(),
-                          -capacity_engine.get_pending_torque()),
-                 "ClutchConstraint engagement capacity bound");
+    auto expect_rejected_preserving_config = [&](const char *label,
+                                                  const DrivenAxle &bad_config) {
+        auto candidate = configs;
+        candidate[0] = bad_config;
+        state.expect(!network.configure(engine, shaft, candidate,
+                                        preserved_count) &&
+                             network.get_axle_count() == preserved_count,
+                     label);
+    };
+    auto bad = configs[0];
+    bad.left = nullptr;
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects null wheel without mutation", bad);
+    bad = configs[0];
+    bad.right = bad.left;
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects duplicate wheel without mutation", bad);
+    bad = configs[0];
+    bad.left = &engine;
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects reused engine body without mutation", bad);
+    bad = configs[0];
+    bad.left->set_inertia(real_t{0.0});
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects invalid wheel inertia without mutation", bad);
+    bad.left->set_inertia(real_t{1.0});
+    bad = configs[0];
+    bad.share = real_t{0.0};
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects non-positive share without mutation", bad);
+    bad = configs[0];
+    bad.share = std::numeric_limits<real_t>::quiet_NaN();
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects non-finite share without mutation", bad);
+    bad = configs[0];
+    bad.differential.mode = static_cast<DifferentialData::Mode>(99);
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects invalid differential mode without mutation", bad);
+    bad = configs[0];
+    bad.differential.max_lock_torque =
+            std::numeric_limits<real_t>::quiet_NaN();
+    expect_rejected_preserving_config(
+            "RotationalNetwork rejects invalid differential values without mutation", bad);
 
-    RotationalBody neutral_engine;
-    RotationalBody neutral_output;
-    neutral_engine.add_torque(real_t{7.0});
-    neutral_output.add_torque(real_t{-3.0});
-    ClutchConstraint neutral;
-    neutral.set_bodies(neutral_engine, neutral_output);
-    neutral.solve(real_t{0.1}, ClutchSolveInput{
-        real_t{0.0}, real_t{1.0}, real_t{100.0}, real_t{1.0},
-        real_t{0.0}, real_t{100.0}});
-    state.expect(near(neutral_engine.get_pending_torque(), real_t{7.0}) &&
-                     near(neutral_output.get_pending_torque(), real_t{-3.0}),
-                 "ClutchConstraint neutral no-op");
+    // Count preservation alone would miss a partially committed row or body
+    // pointer.  Re-run the old eight-axle program and verify its share table
+    // remains intact after every rejected configure attempt above.
+    engine.clear_torque();
+    shaft.clear_torque();
+    for (auto &wheel : wheels)
+        wheel.clear_torque();
+    shaft.set_angular_velocity(real_t{5.0});
+    const bool preserved_solve = network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    const real_t preserved_reference = wheels[0].get_pending_torque() +
+            wheels[1].get_pending_torque();
+    const real_t preserved_last =
+            wheels[14].get_pending_torque() + wheels[15].get_pending_torque();
+    state.expect(preserved_solve && near(preserved_last / preserved_reference,
+                                         real_t{8.0}, real_t{2e-3}),
+                 "RotationalNetwork rejected configure leaves prior program intact");
+
+    // The direct primary row normalizes arbitrary shares.  Inspecting the
+    // committed wheel torques proves both the 40/60 case and all eight axles.
+    configs[0] = make_config(wheels[0], wheels[1], real_t{4.0});
+    configs[1] = make_config(wheels[2], wheels[3], real_t{6.0});
+    state.expect(network.configure(engine, shaft, configs, 2),
+                 "RotationalNetwork configures 40/60 axle shares");
+    engine.clear_torque();
+    shaft.clear_torque();
+    for (auto &wheel : wheels)
+        wheel.clear_torque();
+    shaft.set_angular_velocity(real_t{5.0});
+    const bool split_result = network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    const real_t split_front_torque = wheels[0].get_pending_torque() +
+            wheels[1].get_pending_torque();
+    const real_t split_rear_torque = wheels[2].get_pending_torque() +
+            wheels[3].get_pending_torque();
+    state.expect(split_result &&
+                         near(split_rear_torque / split_front_torque,
+                              real_t{1.5}),
+                 "RotationalNetwork normalizes 40/60 torque shares");
+
+    state.expect(network.configure(engine, shaft, configs,
+                                   RotationalNetwork::MAX_AXLES),
+                 "RotationalNetwork configures all eight normalized axles");
+    for (std::size_t i = 0; i < RotationalNetwork::MAX_AXLES; ++i)
+        configs[i] = make_config(wheels[2 * i], wheels[2 * i + 1],
+                                 real_t{1.0} + static_cast<real_t>(i));
+    state.expect(network.configure(engine, shaft, configs,
+                                   RotationalNetwork::MAX_AXLES),
+                 "RotationalNetwork rebuilds eight-axle share table");
+    engine.clear_torque();
+    shaft.clear_torque();
+    for (auto &wheel : wheels)
+        wheel.clear_torque();
+    shaft.set_angular_velocity(real_t{5.0});
+    const bool eight_result = network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    bool eight_shares_match = eight_result;
+    for (std::size_t i = 0; i < RotationalNetwork::MAX_AXLES; ++i) {
+        const real_t axle_torque = wheels[2 * i].get_pending_torque() +
+                wheels[2 * i + 1].get_pending_torque();
+        const real_t reference_torque = wheels[0].get_pending_torque() +
+                wheels[1].get_pending_torque();
+        eight_shares_match = eight_shares_match &&
+                near(axle_torque / reference_torque,
+                     (real_t{1.0} + static_cast<real_t>(i)), real_t{2e-3});
+    }
+    state.expect(eight_shares_match,
+                 "RotationalNetwork distributes normalized torque across eight axles");
+
+    // Eight axles plus a non-neutral clutch touches all 18 fixed batch body
+    // slots (engine, shaft, and sixteen wheels) in one network solve.
+    engine.clear_torque();
+    shaft.clear_torque();
+    for (auto &wheel : wheels)
+        wheel.clear_torque();
+    engine.set_angular_velocity(real_t{10.0});
+    shaft.set_angular_velocity(real_t{0.0});
+    for (auto &wheel : wheels)
+        wheel.set_angular_velocity(real_t{0.0});
+    state.expect(network.solve(real_t{0.1}, real_t{2.0}, real_t{1.0},
+                               real_t{100.0}),
+                 "RotationalNetwork fits eight-axle clutch solve in fixed batch");
+
+    // Reconfigure a simple one-axle fixture for clutch and differential
+    // behavior checks.  Unequal wheel inertias are intentional and supported.
+    auto open_config = make_config(wheels[0], wheels[1], real_t{1.0});
+    std::array<DrivenAxle, RotationalNetwork::MAX_AXLES>
+            simple_configs{};
+    simple_configs[0] = open_config;
+    state.expect(network.configure(engine, shaft, simple_configs, 1),
+                 "RotationalNetwork accepts unequal wheel inertias");
+
+    engine.set_angular_velocity(real_t{10.0});
+    shaft.set_angular_velocity(real_t{0.0});
+    wheels[0].set_angular_velocity(real_t{0.0});
+    wheels[1].set_angular_velocity(real_t{0.0});
+    const bool launch = network.solve(
+            real_t{0.1}, real_t{2.0}, real_t{1.0}, real_t{100.0});
+    const ClutchTelemetry launch_telemetry = network.get_clutch_telemetry();
+    state.expect(launch && launch_telemetry.present &&
+                         !launch_telemetry.slipping,
+                 "RotationalNetwork forward clutch commits at capacity");
+    state.expect(launch_telemetry.requested_engine_torque > real_t{0.0} &&
+                         launch_telemetry.transmitted_torque > real_t{0.0} &&
+                         launch_telemetry.output_torque > real_t{0.0} &&
+                         near(launch_telemetry.output_torque,
+                              real_t{2.0} * launch_telemetry.transmitted_torque),
+                 "RotationalNetwork forward clutch telemetry signs");
+    engine.integrate(real_t{0.1});
+    shaft.integrate(real_t{0.1});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+    state.expect(near(engine.get_angular_velocity(),
+                      real_t{2.0} * shaft.get_angular_velocity()),
+                 "RotationalNetwork launch reaches signed ratio");
+
+    const bool hold = network.solve(
+            real_t{0.1}, real_t{2.0}, real_t{1.0}, real_t{100.0});
+    const ClutchTelemetry hold_telemetry = network.get_clutch_telemetry();
+    state.expect(hold && hold_telemetry.present && !hold_telemetry.slipping,
+                 "RotationalNetwork synchronized clutch holds without slip");
+    engine.integrate(real_t{0.1});
+    shaft.integrate(real_t{0.1});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+
+    engine.set_angular_velocity(real_t{10.0});
+    shaft.set_angular_velocity(real_t{0.0});
+    wheels[0].set_angular_velocity(real_t{0.0});
+    wheels[1].set_angular_velocity(real_t{0.0});
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    const bool capped = network.solve(
+            real_t{0.1}, real_t{2.0}, real_t{2.0}, real_t{1.0});
+    const ClutchTelemetry capped_telemetry = network.get_clutch_telemetry();
+    state.expect(capped &&
+                         std::abs(capped_telemetry.transmitted_torque) <=
+                                 real_t{1.0} + kEpsilon &&
+                         capped_telemetry.slipping,
+                 "RotationalNetwork clamps over-engagement to hardware capacity");
+
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    engine.set_angular_velocity(real_t{6.0});
+    engine.add_torque(real_t{7.0});
+    const bool neutral = network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{1.0}, real_t{100.0});
+    const ClutchTelemetry neutral_telemetry = network.get_clutch_telemetry();
+    state.expect(neutral && !neutral_telemetry.present &&
+                         near(engine.get_pending_torque(), real_t{7.0}) &&
+                         near(neutral_telemetry.requested_engine_torque,
+                              real_t{0.0}) &&
+                         near(neutral_telemetry.transmitted_torque,
+                              real_t{0.0}) &&
+                         near(neutral_telemetry.output_torque, real_t{0.0}),
+                 "RotationalNetwork neutral omits clutch mutation");
+    engine.clear_torque();
+    engine.set_angular_velocity(real_t{-10.0});
+    shaft.set_angular_velocity(real_t{0.0});
+    wheels[0].set_angular_velocity(real_t{0.0});
+    wheels[1].set_angular_velocity(real_t{0.0});
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    const bool reverse = network.solve(
+            real_t{0.1}, real_t{-2.0}, real_t{1.0}, real_t{100.0});
+    const ClutchTelemetry reverse_telemetry = network.get_clutch_telemetry();
+    engine.integrate(real_t{0.1});
+    shaft.integrate(real_t{0.1});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+    state.expect(reverse && reverse_telemetry.present &&
+                         near(engine.get_angular_velocity() +
+                                      real_t{2.0} * shaft.get_angular_velocity(),
+                              real_t{0.0}),
+                 "RotationalNetwork reverse signed ratio");
+    state.expect(near(reverse_telemetry.requested_engine_torque,
+                      reverse_telemetry.transmitted_torque) &&
+                         near(reverse_telemetry.output_torque,
+                              real_t{-2.0} * reverse_telemetry.transmitted_torque),
+                 "RotationalNetwork reverse clutch telemetry signs");
+    // Open axle couples the carrier but leaves left/right relative speed free.
+    wheels[0].set_inertia(real_t{1.0});
+    wheels[1].set_inertia(real_t{1.0});
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    shaft.set_angular_velocity(real_t{5.0});
+    wheels[0].set_angular_velocity(real_t{3.0});
+    wheels[1].set_angular_velocity(real_t{-1.0});
+    const real_t open_relative_before =
+            wheels[0].get_angular_velocity() - wheels[1].get_angular_velocity();
+    const bool open_runtime = network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    shaft.integrate(real_t{0.1});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+    const real_t open_relative_after =
+            wheels[0].get_angular_velocity() - wheels[1].get_angular_velocity();
+    const real_t open_carrier_after = real_t{0.5} *
+            (wheels[0].get_angular_velocity() + wheels[1].get_angular_velocity());
+    state.expect(open_runtime &&
+                         near(open_relative_after, open_relative_before) &&
+                         near(shaft.get_angular_velocity(), open_carrier_after),
+                 "RotationalNetwork open axle preserves relative slip while coupling carrier");
+
+    // Locked axle equalizes wheel speeds while conserving momentum.
+    simple_configs[0] = make_config(wheels[0], wheels[1], real_t{1.0},
+                                     DifferentialData::LOCKED);
+    RotationalNetwork locked_network;
+    state.expect(locked_network.configure(engine, shaft, simple_configs, 1),
+                 "RotationalNetwork configures locked runtime program");
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    shaft.set_angular_velocity(real_t{0.0});
+    wheels[0].set_angular_velocity(real_t{6.0});
+    wheels[1].set_angular_velocity(real_t{-2.0});
+    const real_t locked_momentum_before =
+            shaft.get_inertia() * shaft.get_angular_velocity() +
+            wheels[0].get_inertia() * wheels[0].get_angular_velocity() +
+            wheels[1].get_inertia() * wheels[1].get_angular_velocity();
+    const real_t locked_energy_before = real_t{0.5} *
+            (shaft.get_inertia() * shaft.get_angular_velocity() *
+                     shaft.get_angular_velocity() +
+             wheels[0].get_inertia() * wheels[0].get_angular_velocity() *
+                     wheels[0].get_angular_velocity() +
+             wheels[1].get_inertia() * wheels[1].get_angular_velocity() *
+                     wheels[1].get_angular_velocity());
+    const bool locked_runtime = locked_network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    shaft.integrate(real_t{0.1});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+    const real_t locked_momentum_after =
+            shaft.get_inertia() * shaft.get_angular_velocity() +
+            wheels[0].get_inertia() * wheels[0].get_angular_velocity() +
+            wheels[1].get_inertia() * wheels[1].get_angular_velocity();
+    const real_t locked_energy_after = real_t{0.5} *
+            (shaft.get_inertia() * shaft.get_angular_velocity() *
+                     shaft.get_angular_velocity() +
+             wheels[0].get_inertia() * wheels[0].get_angular_velocity() *
+                     wheels[0].get_angular_velocity() +
+             wheels[1].get_inertia() * wheels[1].get_angular_velocity() *
+                     wheels[1].get_angular_velocity());
+    state.expect(locked_runtime &&
+                         near(shaft.get_angular_velocity(),
+                              wheels[0].get_angular_velocity()) &&
+                         near(wheels[0].get_angular_velocity(),
+                              wheels[1].get_angular_velocity()) &&
+                         near(locked_momentum_after, locked_momentum_before) &&
+                         locked_energy_after <= locked_energy_before + kEpsilon,
+                 "RotationalNetwork locked axle equalizes wheels with conserved momentum and dissipated energy");
+
+    simple_configs[0] = make_config(wheels[0], wheels[1], real_t{1.0},
+                                     DifferentialData::LIMITED_SLIP,
+                                     real_t{0.0}, real_t{0.0}, real_t{0.0},
+                                     real_t{0.25}, real_t{1.0});
+    RotationalNetwork lsd_network;
+    state.expect(lsd_network.configure(engine, shaft, simple_configs, 1),
+                 "RotationalNetwork configures limited-slip axle");
+    shaft.set_angular_velocity(real_t{2.0});
+    wheels[0].set_angular_velocity(real_t{4.0});
+    wheels[1].set_angular_velocity(real_t{0.0});
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    const real_t lsd_relative_before =
+            wheels[0].get_angular_velocity() - wheels[1].get_angular_velocity();
+    const bool lsd_result = lsd_network.solve(
+            real_t{0.1}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    wheels[0].integrate(real_t{0.1});
+    wheels[1].integrate(real_t{0.1});
+    const real_t lsd_relative_after =
+            wheels[0].get_angular_velocity() - wheels[1].get_angular_velocity();
+    const real_t lsd_capacity = simple_configs[0].differential.capacity(
+            real_t{20.0}, real_t{2.0}, real_t{4.0});
+    const DifferentialSettings open_settings{};
+    const real_t open_capacity = open_settings.capacity(
+            real_t{1.0}, real_t{1.0}, real_t{1.0});
+    const real_t locked_capacity = make_config(
+            wheels[0], wheels[1], real_t{1.0}, DifferentialData::LOCKED)
+                                         .differential
+                                         .capacity(real_t{1.0}, real_t{1.0},
+                                                   real_t{1.0});
+    state.expect(lsd_result && near(lsd_capacity, real_t{1.0}) &&
+                         near(open_capacity, real_t{0.0}) &&
+                         !std::isfinite(locked_capacity) &&
+                         lsd_relative_after > real_t{0.0} &&
+                         lsd_relative_after < lsd_relative_before,
+                 "RotationalNetwork LSD reduces slip without crossing or exceeding capacity");
+
+    // Invalid public controls are rejected before staging.  Each case first
+    // seeds valid clutch telemetry, then verifies both body torque atomicity
+    // and the documented reset-on-entry telemetry contract.
+    const auto telemetry_is_clear = [](const ClutchTelemetry &telemetry) {
+        return !telemetry.present && !telemetry.slipping &&
+                near(telemetry.requested_engine_torque, real_t{0.0}) &&
+                near(telemetry.transmitted_torque, real_t{0.0}) &&
+                near(telemetry.output_torque, real_t{0.0}) &&
+                near(telemetry.slip, real_t{0.0});
+    };
+    auto expect_invalid_public_solve = [&](const char *label,
+                                                real_t dt,
+                                                real_t signed_ratio,
+                                                real_t engagement,
+                                                real_t clutch_max_torque) {
+        engine.clear_torque();
+        shaft.clear_torque();
+        wheels[0].clear_torque();
+        wheels[1].clear_torque();
+        engine.set_angular_velocity(real_t{10.0});
+        shaft.set_angular_velocity(real_t{0.0});
+        wheels[0].set_angular_velocity(real_t{0.0});
+        wheels[1].set_angular_velocity(real_t{0.0});
+        const bool seeded = network.solve(
+                real_t{0.1}, real_t{2.0}, real_t{1.0}, real_t{100.0});
+        const ClutchTelemetry seeded_telemetry = network.get_clutch_telemetry();
+        state.expect(seeded && seeded_telemetry.present,
+                     "RotationalNetwork invalid-input fixture seeds telemetry");
+        const real_t engine_torque_before = engine.get_pending_torque();
+        const real_t shaft_torque_before = shaft.get_pending_torque();
+        const real_t left_torque_before = wheels[0].get_pending_torque();
+        const real_t right_torque_before = wheels[1].get_pending_torque();
+        const bool result = network.solve(
+                dt, signed_ratio, engagement, clutch_max_torque);
+        const ClutchTelemetry cleared_telemetry = network.get_clutch_telemetry();
+        state.expect(!result && telemetry_is_clear(cleared_telemetry) &&
+                             near(engine.get_pending_torque(), engine_torque_before) &&
+                             near(shaft.get_pending_torque(), shaft_torque_before) &&
+                             near(wheels[0].get_pending_torque(), left_torque_before) &&
+                             near(wheels[1].get_pending_torque(), right_torque_before),
+                     label);
+    };
+    expect_invalid_public_solve(
+            "RotationalNetwork rejects zero dt and clears telemetry",
+            real_t{0.0}, real_t{2.0}, real_t{1.0}, real_t{100.0});
+    expect_invalid_public_solve(
+            "RotationalNetwork rejects non-finite dt and clears telemetry",
+            std::numeric_limits<real_t>::quiet_NaN(), real_t{2.0},
+            real_t{1.0}, real_t{100.0});
+    expect_invalid_public_solve(
+            "RotationalNetwork rejects non-finite ratio and clears telemetry",
+            real_t{0.1}, std::numeric_limits<real_t>::infinity(),
+            real_t{1.0}, real_t{100.0});
+    expect_invalid_public_solve(
+            "RotationalNetwork rejects non-finite engagement and clears telemetry",
+            real_t{0.1}, real_t{2.0},
+            std::numeric_limits<real_t>::quiet_NaN(), real_t{100.0});
+    expect_invalid_public_solve(
+            "RotationalNetwork rejects non-finite capacity and clears telemetry",
+            real_t{0.1}, real_t{2.0}, real_t{1.0},
+            std::numeric_limits<real_t>::infinity());
+
+    // Stage a finite primary impulse against a body whose existing pending
+    // torque makes the final accumulated torque overflow.  The consolidated
+    // commit boundary must reject the solve without mutating any body.
+    engine.clear_torque();
+    shaft.clear_torque();
+    wheels[0].clear_torque();
+    wheels[1].clear_torque();
+    engine.set_angular_velocity(real_t{0.0});
+    shaft.set_angular_velocity(-std::numeric_limits<real_t>::max());
+    wheels[0].set_angular_velocity(real_t{0.0});
+    wheels[1].set_angular_velocity(real_t{0.0});
+    const real_t overflow_torque = std::numeric_limits<real_t>::max();
+    shaft.add_torque(overflow_torque);
+    const real_t engine_torque_before = engine.get_pending_torque();
+    const real_t shaft_torque_before = shaft.get_pending_torque();
+    const real_t left_torque_before = wheels[0].get_pending_torque();
+    const real_t right_torque_before = wheels[1].get_pending_torque();
+    const bool overflow_result = network.solve(
+            real_t{1.0}, real_t{0.0}, real_t{0.0}, real_t{0.0});
+    state.expect(!overflow_result &&
+                         near(engine.get_pending_torque(), engine_torque_before) &&
+                         near(shaft.get_pending_torque(), shaft_torque_before) &&
+                         near(wheels[0].get_pending_torque(), left_torque_before) &&
+                         near(wheels[1].get_pending_torque(), right_torque_before) &&
+                         telemetry_is_clear(network.get_clutch_telemetry()),
+                 "RotationalNetwork final torque overflow rejects atomically");
+
 }
 
 void advance_shift(Gearbox &gearbox, real_t dt, int steps) {
@@ -282,460 +868,6 @@ void test_gearbox(TestState &state) {
     for (int i = 0; i < 25; ++i)
         automatic.update_shifting_logic(real_t{0.01});
     state.expect(automatic.is_shifting(), "Gearbox automatic upshift threshold");
-}
-
-void test_coupling(TestState &state) {
-    auto carrier = [](const Axle *axle) {
-        const auto &wheels = axle->get_wheels();
-        return real_t{0.5} * (wheels[0]->get_angular_velocity() +
-                             wheels[1]->get_angular_velocity());
-    };
-    auto relative = [](const Axle *axle) {
-        const auto &wheels = axle->get_wheels();
-        return wheels[0]->get_angular_velocity() -
-               wheels[1]->get_angular_velocity();
-    };
-    auto axle_momentum = [](const Axle *axle) {
-        const auto &wheels = axle->get_wheels();
-        constexpr real_t wheel_inertia = real_t{0.9};
-        return wheel_inertia * (wheels[0]->get_angular_velocity() +
-                                wheels[1]->get_angular_velocity());
-    };
-    auto axle_energy = [](const Axle *axle) {
-        const auto &wheels = axle->get_wheels();
-        constexpr real_t wheel_inertia = real_t{0.9};
-        return real_t{0.5} * wheel_inertia *
-               (std::pow(wheels[0]->get_angular_velocity(), 2) +
-                std::pow(wheels[1]->get_angular_velocity(), 2));
-    };
-
-    // One driven axle: OPEN couples only the carrier to the shaft and leaves
-    // its left/right speed difference intact. The non-driven axle is ignored.
-    RotationalBody shaft;
-    shaft.set_inertia(real_t{1.0});
-    shaft.set_angular_velocity(real_t{4.0});
-    Axle *open_axle = make_axle(real_t{1.0}, real_t{0.3},
-                                make_differential_data(DifferentialData::OPEN));
-    Axle *free_axle = make_axle(real_t{0.0});
-    const auto &open_wheels = open_axle->get_wheels();
-    const auto &free_wheels = free_axle->get_wheels();
-    set_wheel_angular_velocity(open_wheels[0], real_t{8.0});
-    set_wheel_angular_velocity(open_wheels[1], real_t{2.0});
-    set_wheel_angular_velocity(free_wheels[0], real_t{5.0});
-    set_wheel_angular_velocity(free_wheels[1], real_t{5.0});
-    const real_t initial_open_momentum = shaft.get_inertia() * shaft.get_angular_velocity() +
-        axle_momentum(open_axle);
-    const real_t initial_open_energy = real_t{0.5} * shaft.get_inertia() *
-        shaft.get_angular_velocity() * shaft.get_angular_velocity() +
-        axle_energy(open_axle);
-    ShaftWheelsCouplingConstraint single_coupling;
-    single_coupling.load_bodies(&shaft, std::vector<Axle *>{open_axle, free_axle},
-                                Ref<DifferentialData>());
-    state.expect(near(single_coupling.get_aggregate_inertia(), real_t{2.8}),
-                 "Single axle coupling uses shaft plus carrier inertia");
-    single_coupling.solve(real_t{0.1});
-    shaft.integrate(real_t{0.1});
-    open_axle->integrate(real_t{0.1});
-    free_axle->integrate(real_t{0.1});
-    const real_t final_open_energy = real_t{0.5} * shaft.get_inertia() *
-        shaft.get_angular_velocity() * shaft.get_angular_velocity() +
-        axle_energy(open_axle);
-    state.expect(near(shaft.get_angular_velocity(), real_t{4.642857142857143}) &&
-                     near(carrier(open_axle), shaft.get_angular_velocity()) &&
-                     near(relative(open_axle), real_t{6.0}),
-                 "Single axle OPEN reaches shaft carrier without spool behavior");
-    state.expect(near(free_wheels[0]->get_angular_velocity(), real_t{5.0}) &&
-                     near(free_wheels[1]->get_angular_velocity(), real_t{5.0}) &&
-                     near(shaft.get_inertia() * shaft.get_angular_velocity() +
-                              axle_momentum(open_axle), initial_open_momentum, real_t{2e-3}) &&
-                     final_open_energy <= initial_open_energy + kEpsilon,
-                 "Single axle excludes non-driven wheels and preserves invariants");
-
-    // Axle-local modes are exercised independently of shaft projection.
-    Axle *locked_axle = make_axle(real_t{1.0}, real_t{0.3},
-                                  make_differential_data(DifferentialData::LOCKED));
-    Axle *lsd_axle = make_axle(real_t{1.0}, real_t{0.3},
-                               make_differential_data(DifferentialData::LIMITED_SLIP,
-                                                      real_t{2.0}, real_t{0.25},
-                                                      real_t{0.25}, real_t{0.0},
-                                                      real_t{20.0}));
-    set_wheel_angular_velocity(locked_axle->get_wheels()[0], real_t{8.0});
-    set_wheel_angular_velocity(locked_axle->get_wheels()[1], real_t{2.0});
-    set_wheel_angular_velocity(lsd_axle->get_wheels()[0], real_t{8.0});
-    set_wheel_angular_velocity(lsd_axle->get_wheels()[1], real_t{2.0});
-    locked_axle->get_differential().solve_relative(real_t{0.1});
-    lsd_axle->get_differential().add_carrier_torque(real_t{40.0});
-    lsd_axle->get_differential().solve_relative(real_t{0.1});
-    locked_axle->integrate(real_t{0.1});
-    lsd_axle->integrate(real_t{0.1});
-    state.expect(near(carrier(locked_axle), real_t{5.0}) &&
-                     near(relative(locked_axle), real_t{0.0}),
-                 "Axle LOCKED reaches equal wheel speed");
-    state.expect(std::abs(relative(lsd_axle)) < real_t{6.0} &&
-                     relative(lsd_axle) > real_t{0.0},
-                 "Axle LIMITED_SLIP reduces bounded wheel slip without crossing");
-    state.expect(axle_momentum(locked_axle) > real_t{0.0} &&
-                     std::isfinite(axle_energy(locked_axle)) &&
-                     std::isfinite(axle_energy(lsd_axle)),
-                 "Axle differential outputs remain finite and energized physically");
-
-    // AWD with 40/60 shares. Choose shaft speed equal to the weighted carrier
-    // average so the primary constraint is idle and OPEN center behavior is
-    // observed directly: front/rear relative speed remains nonzero.
-    RotationalBody awd_shaft;
-    awd_shaft.set_inertia(real_t{1.0});
-    awd_shaft.set_angular_velocity(real_t{3.2});
-    Axle *front = make_axle(real_t{0.4}, real_t{0.3},
-                            make_differential_data(DifferentialData::OPEN));
-    Axle *rear = make_axle(real_t{0.6}, real_t{0.3},
-                           make_differential_data(DifferentialData::OPEN));
-    set_wheel_angular_velocity(front->get_wheels()[0], real_t{8.0});
-    set_wheel_angular_velocity(front->get_wheels()[1], real_t{2.0});
-    set_wheel_angular_velocity(rear->get_wheels()[0], real_t{4.0});
-    set_wheel_angular_velocity(rear->get_wheels()[1], real_t{0.0});
-    const real_t initial_awd_momentum = awd_shaft.get_inertia() *
-        awd_shaft.get_angular_velocity() + axle_momentum(front) + axle_momentum(rear);
-    ShaftWheelsCouplingConstraint awd_open;
-    awd_open.load_bodies(&awd_shaft, std::vector<Axle *>{front, rear},
-                         make_differential_data(DifferentialData::OPEN));
-    awd_open.solve(real_t{0.1});
-    awd_shaft.integrate(real_t{0.1});
-    front->integrate(real_t{0.1});
-    rear->integrate(real_t{0.1});
-    const real_t weighted_open = real_t{0.4} * carrier(front) +
-                                 real_t{0.6} * carrier(rear);
-    state.expect(near(weighted_open, awd_shaft.get_angular_velocity()) &&
-                     std::abs(carrier(front) - carrier(rear)) > real_t{2.0} &&
-                     near(relative(front), real_t{6.0}) &&
-                     near(relative(rear), real_t{4.0}),
-                 "AWD OPEN center preserves weighted shaft constraint and relative speed");
-    state.expect(near(awd_shaft.get_inertia() * awd_shaft.get_angular_velocity() +
-                          axle_momentum(front) + axle_momentum(rear),
-                      initial_awd_momentum, real_t{2e-3}),
-                 "AWD OPEN center conserves momentum");
-
-    Axle *locked_front = make_axle(real_t{0.4}, real_t{0.3},
-                                   make_differential_data(DifferentialData::LOCKED));
-    Axle *locked_rear = make_axle(real_t{0.6}, real_t{0.3},
-                                  make_differential_data(DifferentialData::LOCKED));
-    RotationalBody locked_shaft;
-    locked_shaft.set_inertia(real_t{1.0});
-    locked_shaft.set_angular_velocity(real_t{3.2});
-    set_wheel_angular_velocity(locked_front->get_wheels()[0], real_t{8.0});
-    set_wheel_angular_velocity(locked_front->get_wheels()[1], real_t{2.0});
-    set_wheel_angular_velocity(locked_rear->get_wheels()[0], real_t{4.0});
-    set_wheel_angular_velocity(locked_rear->get_wheels()[1], real_t{0.0});
-    const real_t initial_locked_energy = real_t{0.5} * locked_shaft.get_inertia() *
-        locked_shaft.get_angular_velocity() * locked_shaft.get_angular_velocity() +
-        axle_energy(locked_front) + axle_energy(locked_rear);
-    ShaftWheelsCouplingConstraint awd_locked;
-    awd_locked.load_bodies(&locked_shaft,
-                           std::vector<Axle *>{locked_front, locked_rear},
-                           make_differential_data(DifferentialData::LOCKED));
-    awd_locked.solve(real_t{0.1});
-    locked_shaft.integrate(real_t{0.1});
-    locked_front->integrate(real_t{0.1});
-    locked_rear->integrate(real_t{0.1});
-    const real_t final_locked_energy = real_t{0.5} * locked_shaft.get_inertia() *
-        locked_shaft.get_angular_velocity() * locked_shaft.get_angular_velocity() +
-        axle_energy(locked_front) + axle_energy(locked_rear);
-    state.expect(near(carrier(locked_front), carrier(locked_rear), real_t{2e-3}) &&
-                     near(locked_shaft.get_angular_velocity(), carrier(locked_front), real_t{2e-3}) &&
-                     near(relative(locked_front), real_t{0.0}) &&
-                     near(relative(locked_rear), real_t{0.0}) &&
-                     final_locked_energy <= initial_locked_energy + kEpsilon,
-                 "AWD LOCKED center and axle differentials enforce equality");
-
-    Axle *lsd_front = make_axle(real_t{0.4}, real_t{0.3},
-                                make_differential_data(DifferentialData::OPEN));
-    Axle *lsd_rear = make_axle(real_t{0.6}, real_t{0.3},
-                               make_differential_data(DifferentialData::OPEN));
-    RotationalBody lsd_shaft;
-    lsd_shaft.set_inertia(real_t{1.0});
-    lsd_shaft.set_angular_velocity(real_t{3.2});
-    set_wheel_angular_velocity(lsd_front->get_wheels()[0], real_t{8.0});
-    set_wheel_angular_velocity(lsd_front->get_wheels()[1], real_t{2.0});
-    set_wheel_angular_velocity(lsd_rear->get_wheels()[0], real_t{4.0});
-    set_wheel_angular_velocity(lsd_rear->get_wheels()[1], real_t{0.0});
-    const real_t initial_lsd_center_slip = carrier(lsd_front) - carrier(lsd_rear);
-    const real_t initial_lsd_energy = real_t{0.5} * lsd_shaft.get_inertia() *
-        lsd_shaft.get_angular_velocity() * lsd_shaft.get_angular_velocity() +
-        axle_energy(lsd_front) + axle_energy(lsd_rear);
-    ShaftWheelsCouplingConstraint awd_lsd;
-    awd_lsd.load_bodies(&lsd_shaft, std::vector<Axle *>{lsd_front, lsd_rear},
-                        make_differential_data(DifferentialData::LIMITED_SLIP,
-                                               real_t{4.0}, real_t{0.0}, real_t{0.0},
-                                               real_t{0.0}, real_t{20.0}));
-    awd_lsd.solve(real_t{0.1});
-    lsd_shaft.integrate(real_t{0.1});
-    lsd_front->integrate(real_t{0.1});
-    lsd_rear->integrate(real_t{0.1});
-    const real_t final_lsd_center_slip = carrier(lsd_front) - carrier(lsd_rear);
-    const real_t final_lsd_energy = real_t{0.5} * lsd_shaft.get_inertia() *
-        lsd_shaft.get_angular_velocity() * lsd_shaft.get_angular_velocity() +
-        axle_energy(lsd_front) + axle_energy(lsd_rear);
-    state.expect(std::abs(final_lsd_center_slip) < std::abs(initial_lsd_center_slip) &&
-                     initial_lsd_center_slip * final_lsd_center_slip >= -kEpsilon &&
-                     std::isfinite(final_lsd_center_slip) &&
-                     final_lsd_energy <= initial_lsd_energy + kEpsilon,
-                 "AWD LIMITED_SLIP center reduces bounded carrier slip without crossing");
-    state.expect(near(real_t{0.4} + real_t{0.6}, real_t{1.0}) &&
-                     near(relative(lsd_front), real_t{6.0}) &&
-                     near(relative(lsd_rear), real_t{4.0}),
-                 "AWD LIMITED_SLIP keeps normalized torque shares and axle differentials");
-
-    // A pending shaft torque is routed by normalized 40/60 shares and excludes
-    // the free axle. Equal weighted carrier state makes the expected torque
-    // increments directly observable after one integration step.
-    RotationalBody route_shaft;
-    route_shaft.set_inertia(real_t{1.0});
-    route_shaft.set_angular_velocity(real_t{3.2});
-    Axle *route_front = make_axle(real_t{0.4});
-    Axle *route_rear = make_axle(real_t{0.6});
-    Axle *route_free = make_axle(real_t{0.0});
-    set_wheel_angular_velocity(route_front->get_wheels()[0], real_t{5.0});
-    set_wheel_angular_velocity(route_front->get_wheels()[1], real_t{5.0});
-    set_wheel_angular_velocity(route_rear->get_wheels()[0], real_t{5.0});
-    set_wheel_angular_velocity(route_rear->get_wheels()[1], real_t{5.0});
-    set_wheel_angular_velocity(route_free->get_wheels()[0], real_t{7.0});
-    set_wheel_angular_velocity(route_free->get_wheels()[1], real_t{7.0});
-    ShaftWheelsCouplingConstraint route_coupling;
-    route_coupling.load_bodies(&route_shaft,
-                               std::vector<Axle *>{route_front, route_rear, route_free},
-                               make_differential_data(DifferentialData::OPEN));
-    const real_t route_initial_momentum = route_shaft.get_inertia() *
-        route_shaft.get_angular_velocity() + axle_momentum(route_front) +
-        axle_momentum(route_rear);
-    route_shaft.add_torque(real_t{12.0});
-    route_coupling.solve(real_t{0.1});
-    route_shaft.integrate(real_t{0.1});
-    route_front->integrate(real_t{0.1});
-    route_rear->integrate(real_t{0.1});
-    route_free->integrate(real_t{0.1});
-    const real_t front_increment = carrier(route_front) - real_t{5.0};
-    const real_t rear_increment = carrier(route_rear) - real_t{5.0};
-    state.expect(near(front_increment / rear_increment, real_t{2.0 / 3.0}, real_t{2e-3}) &&
-                     near(route_shaft.get_inertia() * route_shaft.get_angular_velocity() +
-                              axle_momentum(route_front) + axle_momentum(route_rear),
-                          route_initial_momentum + real_t{1.2}, real_t{2e-3}) &&
-                     near(route_free->get_wheels()[0]->get_angular_velocity(), real_t{7.0}) &&
-                     near(route_free->get_wheels()[1]->get_angular_velocity(), real_t{7.0}),
-                 "AWD torque route follows 40/60 shares and excludes free axle");
-
-    memdelete(open_axle);
-    memdelete(free_axle);
-    memdelete(locked_axle);
-    memdelete(lsd_axle);
-    memdelete(front);
-    memdelete(rear);
-    memdelete(locked_front);
-    memdelete(locked_rear);
-    memdelete(lsd_front);
-    memdelete(lsd_rear);
-    memdelete(route_front);
-    memdelete(route_rear);
-    memdelete(route_free);
-}
-
-void test_differential_solver(TestState &state) {
-    using Mode = DifferentialData::Mode;
-    using Input = DifferentialSolver::Input;
-
-    const Input base{
-        real_t{2.0}, real_t{6.0}, real_t{8.0}, real_t{2.0},
-        real_t{0.0}, real_t{3.5}, real_t{0.1}};
-    constexpr real_t relative_inertia = real_t{1.5};
-    constexpr real_t ideal_impulse = real_t{-9.0};
-    constexpr real_t initial_momentum = real_t{28.0};
-    constexpr real_t initial_energy = real_t{76.0};
-
-    auto apply_impulse = [](const Input &input, real_t impulse,
-                            real_t &left_velocity, real_t &right_velocity) {
-        left_velocity = input.left_free_velocity + impulse / input.left_inertia;
-        right_velocity = input.right_free_velocity - impulse / input.right_inertia;
-    };
-    auto momentum = [](const Input &input, real_t left_velocity,
-                       real_t right_velocity) {
-        return input.left_inertia * left_velocity +
-               input.right_inertia * right_velocity;
-    };
-    auto energy = [](const Input &input, real_t left_velocity,
-                     real_t right_velocity) {
-        return real_t{0.5} * input.left_inertia * left_velocity * left_velocity +
-               real_t{0.5} * input.right_inertia * right_velocity * right_velocity;
-    };
-
-    Ref<DifferentialData> default_data = memnew(DifferentialData);
-    DifferentialSolver default_solver(**default_data);
-    const DifferentialSolver::Snapshot &default_snapshot =
-            default_solver.get_snapshot();
-    state.expect(default_snapshot.mode == Mode::OPEN &&
-                     near(default_snapshot.preload_torque, real_t{25.0}) &&
-                     near(default_snapshot.power_lock_ratio, real_t{0.35}) &&
-                     near(default_snapshot.coast_lock_ratio, real_t{0.15}) &&
-                     near(default_snapshot.slip_sensitive_gain, real_t{2.0}) &&
-                     near(default_snapshot.max_lock_torque, real_t{250.0}),
-                 "DifferentialData defaults snapshot into DifferentialSolver");
-    state.expect(near(default_solver.solve(base), real_t{0.0}),
-                 "DifferentialData OPEN default remains relative no-op");
-    default_data->set_mode(Mode::LIMITED_SLIP);
-    default_solver.set_snapshot(DifferentialSolver::Snapshot(**default_data));
-    const real_t default_lsd_impulse = default_solver.solve(base);
-    state.expect(std::isfinite(default_lsd_impulse) &&
-                     std::abs(default_lsd_impulse) > real_t{0.0} &&
-                     std::abs(default_lsd_impulse) <=
-                         default_snapshot.max_lock_torque * base.dt + kEpsilon &&
-                     default_lsd_impulse < real_t{0.0},
-                 "DifferentialData defaults switch to bounded LIMITED_SLIP");
-
-    DifferentialSolver open(DifferentialSolver::Snapshot(Mode::OPEN));
-    const real_t open_impulse = open.solve(base);
-    real_t open_left = 0.0;
-    real_t open_right = 0.0;
-    apply_impulse(base, open_impulse, open_left, open_right);
-    state.expect(near(open_impulse, real_t{0.0}) &&
-                     near(open_left, base.left_free_velocity) &&
-                     near(open_right, base.right_free_velocity) &&
-                     near(momentum(base, open_left, open_right), initial_momentum) &&
-                     near(energy(base, open_left, open_right), initial_energy),
-                 "DifferentialSolver OPEN preserves relative motion and energy");
-
-    DifferentialSolver locked(DifferentialSolver::Snapshot(Mode::LOCKED));
-    const real_t locked_impulse = locked.solve(base);
-    state.expect(near(locked_impulse, ideal_impulse) &&
-                     near(-ideal_impulse / base.dt, real_t{90.0}),
-                 "DifferentialSolver LOCKED uses ideal relative impulse");
-    real_t locked_left = 0.0;
-    real_t locked_right = 0.0;
-    apply_impulse(base, locked_impulse, locked_left, locked_right);
-    state.expect(near(locked_left, real_t{3.5}) &&
-                     near(locked_right, real_t{3.5}) &&
-                     near(momentum(base, locked_left, locked_right), initial_momentum),
-                 "DifferentialSolver LOCKED equalizes unequal inertias conservatively");
-
-    DifferentialSolver preload(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{10.0}, real_t{0.0}, real_t{0.0},
-            real_t{0.0}, real_t{100.0}));
-    state.expect(near(preload.solve(base), real_t{-1.0}),
-                 "DifferentialSolver LSD preload torque bounds impulse");
-
-    DifferentialSolver power(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{0.0}, real_t{0.5}, real_t{0.0},
-            real_t{0.0}, real_t{100.0}));
-    Input power_input = base;
-    power_input.transmitted_torque = real_t{40.0};
-    state.expect(near(power.solve(power_input), real_t{-2.0}),
-                 "DifferentialSolver LSD uses power lock ratio");
-
-    DifferentialSolver coast(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{0.0}, real_t{0.0}, real_t{0.25},
-            real_t{0.0}, real_t{100.0}));
-    Input coast_input = base;
-    coast_input.transmitted_torque = real_t{-40.0};
-    state.expect(near(coast.solve(coast_input), real_t{-1.0}),
-                 "DifferentialSolver LSD uses coast lock ratio");
-
-    DifferentialSolver slip_gain(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{0.0}, real_t{0.0}, real_t{0.0},
-            real_t{2.0}, real_t{100.0}));
-    state.expect(near(slip_gain.solve(base), real_t{-1.2}),
-                 "DifferentialSolver LSD adds slip-sensitive capacity");
-
-    DifferentialSolver max_capacity(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{100.0}, real_t{2.0}, real_t{2.0},
-            real_t{10.0}, real_t{3.0}));
-    const real_t capped_impulse = max_capacity.solve(power_input);
-    state.expect(near(capped_impulse, real_t{-0.3}) &&
-                     std::abs(capped_impulse) / base.dt <= real_t{3.0} + kEpsilon,
-                 "DifferentialSolver LSD obeys maximum lock torque");
-
-    Input reverse_drive = power_input;
-    reverse_drive.transmitted_torque = real_t{-40.0};
-    reverse_drive.carrier_velocity = real_t{-3.5};
-    state.expect(near(power.solve(reverse_drive), real_t{-2.0}),
-                 "DifferentialSolver LSD classifies negative-torque reverse drive as power");
-
-    Input reverse_slip = coast_input;
-    reverse_slip.left_free_velocity = real_t{2.0};
-    reverse_slip.right_free_velocity = real_t{8.0};
-    const real_t reverse_impulse = coast.solve(reverse_slip);
-    real_t reverse_left = 0.0;
-    real_t reverse_right = 0.0;
-    apply_impulse(reverse_slip, reverse_impulse, reverse_left, reverse_right);
-    state.expect(near(reverse_impulse, real_t{1.0}) &&
-                     near(reverse_left, real_t{2.5}) &&
-                     near(reverse_right, real_t{7.833333333333333}) &&
-                     reverse_left - reverse_right < real_t{0.0},
-                 "DifferentialSolver LSD reverses impulse with slip direction");
-
-    DifferentialSolver combined(DifferentialSolver::Snapshot(
-            Mode::LIMITED_SLIP, real_t{5.0}, real_t{0.5}, real_t{0.25},
-            real_t{1.0}, real_t{100.0}));
-    const real_t combined_impulse = combined.solve(power_input);
-    real_t combined_left = 0.0;
-    real_t combined_right = 0.0;
-    apply_impulse(base, combined_impulse, combined_left, combined_right);
-    const real_t initial_slip = base.left_free_velocity - base.right_free_velocity;
-    const real_t final_slip = combined_left - combined_right;
-    state.expect(near(combined_impulse, real_t{-3.1}) &&
-                     std::abs(final_slip) < std::abs(initial_slip) &&
-                     initial_slip * final_slip >= -kEpsilon &&
-                     near(momentum(base, combined_left, combined_right), initial_momentum) &&
-                     energy(base, combined_left, combined_right) <=
-                         initial_energy + kEpsilon,
-                 "DifferentialSolver LSD preserves momentum and dissipates slip energy");
-    state.expect(near(relative_inertia,
-                      (base.left_inertia * base.right_inertia) /
-                          (base.left_inertia + base.right_inertia)) &&
-                     near((base.left_inertia * base.left_free_velocity +
-                           base.right_inertia * base.right_free_velocity) /
-                              (base.left_inertia + base.right_inertia),
-                          real_t{3.5}),
-                 "DifferentialSolver relative effective inertia and carrier are stable");
-
-    Input invalid = base;
-    invalid.dt = real_t{0.0};
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects zero timestep");
-    invalid.dt = real_t{-0.1};
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects negative timestep");
-    invalid.dt = std::numeric_limits<real_t>::quiet_NaN();
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects non-finite timestep");
-    invalid = base;
-    invalid.left_inertia = real_t{0.0};
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects zero left inertia");
-    invalid = base;
-    invalid.right_inertia = real_t{-1.0};
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects negative right inertia");
-    invalid = base;
-    invalid.left_free_velocity = std::numeric_limits<real_t>::quiet_NaN();
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects non-finite output velocity");
-    invalid = base;
-    invalid.transmitted_torque = std::numeric_limits<real_t>::infinity();
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects non-finite transmitted torque");
-    invalid = base;
-    invalid.carrier_velocity = std::numeric_limits<real_t>::quiet_NaN();
-    state.expect(near(combined.solve(invalid), real_t{0.0}),
-                 "DifferentialSolver rejects non-finite carrier velocity");
-    DifferentialSolver::Snapshot invalid_snapshot(
-            static_cast<Mode>(99), real_t{0.0}, real_t{0.0}, real_t{0.0},
-            real_t{0.0}, real_t{100.0});
-    DifferentialSolver invalid_solver(invalid_snapshot);
-    state.expect(near(invalid_solver.solve(base), real_t{0.0}),
-                 "DifferentialSolver rejects invalid mode");
-    DifferentialSolver::Snapshot nan_snapshot(
-            Mode::LIMITED_SLIP,
-            std::numeric_limits<real_t>::quiet_NaN(), real_t{0.0}, real_t{0.0},
-            real_t{0.0}, real_t{100.0});
-    DifferentialSolver nan_solver(nan_snapshot);
-    state.expect(near(nan_solver.solve(base), real_t{0.0}),
-                 "DifferentialSolver rejects non-finite configuration");
 }
 
 void test_engine(TestState &state) {
@@ -884,21 +1016,30 @@ void test_setup_validation(TestState &state) {
 
     Axle *first_driven = make_axle(real_t{0.4});
     Axle *second_driven = make_axle(real_t{0.6});
-    state.expect(!VehicleSetupValidation::validate(
-                         valid_config, {first_driven, second_driven}, error) &&
-                     error.find("center_differential_data") >= 0,
-                 "Vehicle setup validation requires a center differential for AWD");
-    valid_config->set_center_differential_data(
-            make_differential_data(DifferentialData::OPEN));
     state.expect(VehicleSetupValidation::validate(
                          valid_config, {first_driven, second_driven}, error),
-                 "Vehicle setup validation accepts complete two-axle AWD topology");
+                 "Vehicle setup validation accepts two-axle AWD without center configuration");
 
     Axle *third_driven = make_axle(real_t{0.2});
-    state.expect(!VehicleSetupValidation::validate(
-                         valid_config, {first_driven, second_driven, third_driven}, error) &&
-                     error.find("at most two driven axles") >= 0,
-                 "Vehicle setup validation rejects more than two driven axles");
+    state.expect(VehicleSetupValidation::validate(
+                         valid_config,
+                         {first_driven, second_driven, third_driven}, error),
+                 "Vehicle setup validation accepts up to eight driven axles");
+
+    std::vector<Axle *> eight_driven;
+    eight_driven.reserve(RotationalNetwork::MAX_AXLES + 1);
+    for (std::size_t i = 0; i < RotationalNetwork::MAX_AXLES; ++i)
+        eight_driven.push_back(make_axle(real_t{1.0}));
+    state.expect(VehicleSetupValidation::validate(valid_config, eight_driven,
+                                                  error),
+                 "Vehicle setup validation accepts exactly eight driven axles");
+    eight_driven.push_back(make_axle(real_t{1.0}));
+    state.expect(!VehicleSetupValidation::validate(valid_config, eight_driven,
+                                                   error) &&
+                         error.find("at most eight driven axles") >= 0,
+                 "Vehicle setup validation rejects nine driven axles");
+    for (Axle *driven_axle : eight_driven)
+        memdelete(driven_axle);
     memdelete(first_driven);
     memdelete(second_driven);
     memdelete(third_driven);
@@ -913,10 +1054,9 @@ void DrivetrainRegression::_bind_methods() {
 bool DrivetrainRegression::run() {
     TestState state;
     test_rotational_body(state);
-    test_clutch_constraint(state);
+    test_rotational_constraint(state);
+    test_rotational_network(state);
     test_gearbox(state);
-    test_coupling(state);
-    test_differential_solver(state);
     test_engine(state);
     test_setup_validation(state);
     if (state.failures != 0)

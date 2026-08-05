@@ -4,7 +4,7 @@
 		One-shot aggregate of Vehicle setup resources.
 	</brief_description>
 	<description>
-		VehicleConfig supplies the resources consumed during one-shot Vehicle initialization. Engine, gearbox, and suspension data are required. Aerodynamics and turbo data are optional. When two driven axles are configured, [member center_differential_data] is required to solve their weighted carrier coordinate. VehicleSetupValidation reports missing major resources and invalid topology before runtime state is configured; changing this resource after initialization does not reconfigure the Vehicle.
+		VehicleConfig supplies the resources consumed during one-shot Vehicle initialization. Engine, gearbox, and suspension data are required. Aerodynamics and turbo data are optional. Direct drivetrain setup copies each driven axle's two wheel bodies, positive [member Axle.drive_share], and [member Axle.differential_data] into [code]DrivenAxle[/code] and [code]DifferentialSettings[/code] values. One through eight driven axles are supported; positive shares are normalized as flat weights with no inter-axle differential. The network receives direct solve arguments for timestep, signed ratio, engagement, and clutch capacity, and retains [code]ClutchTelemetry[/code] after successful atomic commit. VehicleSetupValidation reports missing major resources and invalid composition before runtime state is configured; changing this resource after initialization does not reconfigure the Vehicle.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -44,13 +44,6 @@
 		<method name="get_turbo_data" qualifiers="const">
 			<return type="TurboData" /><description>Returns optional turbo configuration data.</description>
 		</method>
-		<method name="set_center_differential_data" qualifiers="">
-			<return type="void" /><param index="0" name="data" type="DifferentialData" />
-			<description>Sets the center differential required when two driven axles are present.</description>
-		</method>
-		<method name="get_center_differential_data" qualifiers="const">
-			<return type="DifferentialData" /><description>Returns optional center differential configuration.</description>
-		</method>
 	</methods>
 	<members>
 		<member name="engine_data" type="VehicleEngineData" setter="set_engine_data" getter="get_engine_data">Required engine data.</member>
@@ -58,6 +51,5 @@
 		<member name="suspension_data" type="SuspensionData" setter="set_suspension_data" getter="get_suspension_data">Required suspension data.</member>
 		<member name="aero_data" type="VehicleAerodynamicsData" setter="set_aero_data" getter="get_aero_data">Optional aerodynamics data.</member>
 		<member name="turbo_data" type="TurboData" setter="set_turbo_data" getter="get_turbo_data">Optional turbo data.</member>
-		<member name="center_differential_data" type="DifferentialData" setter="set_center_differential_data" getter="get_center_differential_data">Center differential data required for two driven axles.</member>
 	</members>
 </class>

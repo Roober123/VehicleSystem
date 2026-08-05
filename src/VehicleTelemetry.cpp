@@ -14,6 +14,11 @@ void VehicleTelemetry::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_engine_throttle"), &VehicleTelemetry::get_engine_throttle);
     ClassDB::bind_method(D_METHOD("get_driveshaft_rpm"), &VehicleTelemetry::get_driveshaft_rpm);
     ClassDB::bind_method(D_METHOD("get_clutch_engagement"), &VehicleTelemetry::get_clutch_engagement);
+    ClassDB::bind_method(D_METHOD("get_clutch_requested_torque"), &VehicleTelemetry::get_clutch_requested_torque);
+    ClassDB::bind_method(D_METHOD("get_clutch_transmitted_torque"), &VehicleTelemetry::get_clutch_transmitted_torque);
+    ClassDB::bind_method(D_METHOD("get_clutch_output_torque"), &VehicleTelemetry::get_clutch_output_torque);
+    ClassDB::bind_method(D_METHOD("get_clutch_slip"), &VehicleTelemetry::get_clutch_slip);
+    ClassDB::bind_method(D_METHOD("get_clutch_slipping"), &VehicleTelemetry::get_clutch_slipping);
     ClassDB::bind_method(D_METHOD("get_current_gear"), &VehicleTelemetry::get_current_gear);
     ClassDB::bind_method(D_METHOD("get_gear_ratio"), &VehicleTelemetry::get_gear_ratio);
     ClassDB::bind_method(D_METHOD("get_vehicle_speed_kph"), &VehicleTelemetry::get_vehicle_speed_kph);

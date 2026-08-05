@@ -21,6 +21,11 @@ struct VehicleTelemetrySnapshot {
     real_t engine_throttle = 0.0;
     real_t driveshaft_rpm = 0.0;
     real_t clutch_engagement = 0.0;
+    real_t clutch_requested_torque = 0.0;
+    real_t clutch_transmitted_torque = 0.0;
+    real_t clutch_output_torque = 0.0;
+    real_t clutch_slip = 0.0;
+    bool clutch_slipping = false;
     int current_gear = 0;
     real_t gear_ratio = 0.0;
     real_t vehicle_speed_kph = 0.0;

@@ -7,7 +7,6 @@
 #include "Resources/steering_rack_data.h"
 #include "Resources/tire_data.h"
 #include "Resources/differential_data.h"
-#include "Drivetrain/axle_differential.h"
 #include "wheel.h"
 #include "SteeringRack.h"
 #include <vector>
@@ -23,7 +22,6 @@ protected:
     Ref<SteeringRackData> steering_rack_data;
     Ref<TireData> tire_data = nullptr;
     Ref<DifferentialData> differential_data;
-    AxleDifferential differential;
     SteeringRack steering_rack;
 
     static void _bind_methods();
@@ -58,10 +56,6 @@ public:
     void set_differential_data(const Ref<DifferentialData> &value) { differential_data = value; }
     Ref<DifferentialData> get_differential_data() const { return differential_data; }
 
-    bool setup_differential();
-    AxleDifferential &get_differential() { return differential; }
-    const AxleDifferential &get_differential() const { return differential; }
-    real_t solve_differential(real_t dt) { return differential.solve_relative(dt); }
 
     void set_steering_rack_data(const Ref<SteeringRackData> &p_data) { steering_rack_data = p_data; }
     Ref<SteeringRackData> get_steering_rack_data() const { return steering_rack_data; }

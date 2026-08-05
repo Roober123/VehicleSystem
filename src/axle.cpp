@@ -52,15 +52,6 @@ void Axle::_ready() {
         for (auto* wh : wheels)
             wh->set_tire(tire_data);
     }
-    setup_differential();
-}
-
-bool Axle::setup_differential() {
-    if (wheels.size() != 2 || differential_data.is_null()) {
-        differential.reset();
-        return false;
-    }
-    return differential.configure(differential_data, &wheels[0]->body, &wheels[1]->body);
 }
 
 const std::vector<Wheel*>& Axle::get_wheels() const {
