@@ -36,15 +36,15 @@ point_count = 4
 [sub_resource type="VehicleEngineData" id="VehicleEngineData_v40a1"]
 torque_curve = SubResource("Curve_3dlnp")
 idle_rpm = 700.0
-redline_rpm = 4000.0
+redline_rpm = 3500.0
 max_torque = 450.0
 engine_drag = 0.1
 
 [sub_resource type="GearboxData" id="GearboxData_p21br"]
 gear_ratios = PackedFloat64Array(9, 6, 4, 3, 2.5, 2.1, 1.8, 1.5)
-final_drive = 4.0
+final_drive = 3.0
 clutch_max_torque = 800.0
-shift_time = 1.0
+shift_time = 0.6
 clutch_engage_speed = 0.4
 clutch_disengage_speed = 1.25
 downshift_rpm = 0.1
