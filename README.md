@@ -5,8 +5,7 @@ VehicleSystem is a native C++17 vehicle simulation for Godot 4. `Vehicle` is
 the composition root for a validated, one-shot setup. `VehicleRunningGear`
 owns axles, wheels, suspension, steering, tires, traction control, and
 aerodynamics. `VehicleDrivetrain` owns the engine, gearbox, clutch, driveshaft,
-rotational network, and optional turbo. No exhaust subsystem is part of the
-runtime composition.
+rotational network, and optional turbo.
 
 ## Features
 - Highly performant, the system can be used with 120 physics hz and no substeps, but they improve stability in complex multi-axle vehicles.
