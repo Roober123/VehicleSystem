@@ -2,7 +2,10 @@
 
 [ext_resource type="Script" uid="uid://06aisqxy5utj" path="res://test.gd" id="1_2jas5"]
 [ext_resource type="Script" uid="uid://b0goi32hsanjd" path="res://chase_camera.gd" id="1_chasecam"]
-[ext_resource type="Script" uid="uid://tas5wvgmwwdo" path="res://vehicle.gd" id="2_8lvy3"]
+[ext_resource type="ArrayMesh" uid="uid://bv58gtqk0jlb7" path="res://ImportedMesh/truck_mesh.tres" id="2_kkclv"]
+[ext_resource type="Script" uid="uid://bgmbb2jtyi1b4" path="res://vehicle_controller.gd" id="3_controller"]
+[ext_resource type="Script" uid="uid://c2j4l07wy0erj" path="res://vehicle_telemetry_display.gd" id="3_telemetry"]
+[ext_resource type="Script" uid="uid://c1ropaaauwyy1" path="res://wheel_visuals.gd" id="3_wheel_visuals"]
 [ext_resource type="Texture2D" uid="uid://ckr8y6al16fxl" path="res://addons/godot-prototype-texture/PNG/checker_512x512/checker_blue_512x512.png" id="4_ei00m"]
 [ext_resource type="Texture2D" uid="uid://bu5qgesppa7fo" path="res://addons/godot-prototype-texture/PNG/checker_512x512/checker_black_512x512.png" id="4_wcwec"]
 
@@ -17,6 +20,83 @@ sky_material = SubResource("ProceduralSkyMaterial_2jas5")
 background_mode = 2
 sky = SubResource("Sky_n51mc")
 glow_enabled = true
+
+[sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_6yyhk"]
+drag_coefficient = 1.0
+downforce_coefficient = 0.2
+yaw_damping_coefficient = 1.0
+yaw_control_max_torque = 3000.0
+
+[sub_resource type="Curve" id="Curve_3dlnp"]
+_data = [Vector2(0, 0.801105), 0.0, 0.0, 0, 0, Vector2(0.29945058, 1), 0.0, 0.0, 0, 0, Vector2(0.93681324, 0.9005525), -0.25138134, -0.25138134, 0, 0, Vector2(1, 0.54696137), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[sub_resource type="VehicleEngineData" id="VehicleEngineData_v40a1"]
+torque_curve = SubResource("Curve_3dlnp")
+idle_rpm = 700.0
+redline_rpm = 4000.0
+max_torque = 450.0
+engine_drag = 0.1
+
+[sub_resource type="GearboxData" id="GearboxData_p21br"]
+gear_ratios = PackedFloat64Array(9, 6, 4, 3, 2.5, 2.1, 1.8, 1.5)
+final_drive = 4.0
+clutch_max_torque = 800.0
+shift_time = 2.0
+downshift_rpm = 0.1
+auto_mode = false
+driveshaft_drag = 0.7
+
+[sub_resource type="SuspensionData" id="SuspensionData_7jkea"]
+rest_compression = 0.45
+damping_ratio = 0.4
+antiroll_bar_stiffness = 5000.0
+
+[sub_resource type="VehicleConfig" id="VehicleConfig_hl4on"]
+engine_data = SubResource("VehicleEngineData_v40a1")
+gearbox_data = SubResource("GearboxData_p21br")
+suspension_data = SubResource("SuspensionData_7jkea")
+aero_data = SubResource("VehicleAerodynamicsData_6yyhk")
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_mt10o"]
+points = PackedVector3Array(0.70895374, -0.7459604, 0.8402614, -0.7260659, -0.74632007, 0.8401434, 0.65163165, 1.8372062, 0.72555965, 0.53670645, -1.7796587, 0.26628053, -0.5538186, 1.6073756, 0.26628053, -0.38157126, 1.8372062, 1.4143603, 0.37968266, -0.20663056, 1.3552152, -0.49649647, -1.7796587, 0.26628053, 0.53670645, 1.6073756, 0.26628053, 0.65163165, 1.8372062, 1.2994225, 0.1922118, -1.6073756, 0.89749426, -0.61128116, 1.8372062, 1.3567734, -0.34650946, -0.2075758, 1.3577021, -0.38157126, -1.205262, 0.20881164, -0.5538186, -1.7796587, 0.55327094, 0.70895374, -0.63122493, 1.069783, 0.24967441, 1.3771853, 0.20881164, -0.20932394, -1.6073756, 0.89749426, 0.42192173, 1.8372062, 1.4143603, 0.42192173, -1.8372062, 0.55327094, 0.36445913, -1.205262, 0.20881164, -0.5564118, -0.20825402, 1.307142, -0.7260659, -0.63122493, 1.069783, 0.5974008, -0.21062113, 1.2593493, 0.53670645, -1.7796587, 0.55327094, -0.32410866, -1.8372062, 0.6107398, -0.5538186, -1.7796587, 0.38110033, 0.36445913, -1.4926401, 0.89749426, -0.7260659, -0.63122493, 0.8401434, -0.5658, 1.6985722, 0.6258955, -0.43903387, 1.7796587, 1.4143603, -0.38157126, -1.4347329, 0.89749426)
+
+[sub_resource type="Curve" id="Curve_ei00m"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.21551722, 1), 0.0, 0.0, 0, 0, Vector2(0.49784482, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.65271974), 0.0, 0.0, 0, 0]
+point_count = 5
+
+[sub_resource type="Curve" id="Curve_ugfer"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 0.10468469, 0, 0, Vector2(1.0043104, 0.9916319), 0.0, 0.0, 0, 0, Vector2(2, 0.8577407), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="TireData" id="TireData_2hm57"]
+forward_friction_curve = SubResource("Curve_ei00m")
+lateral_friction_curve = SubResource("Curve_ugfer")
+radius = 0.55
+drag = 0.15
+peak_slip_angle = 12.0
+tire_width = 0.3
+combined_grip_exponent = 2.5
+
+[sub_resource type="DifferentialData" id="DifferentialData_ray1q"]
+mode = 2
+
+[sub_resource type="SteeringRackData" id="SteeringRackData_y4awt"]
+proportional_gain = 100.0
+sat_gain = 0.15
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ray1q"]
+top_radius = 0.55
+bottom_radius = 0.55
+height = 0.3
+
+[sub_resource type="DifferentialData" id="DifferentialData_porlw"]
+mode = 2
+
+[sub_resource type="DifferentialData" id="DifferentialData_vvvqn"]
+mode = 2
 
 [sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_gi0ev"]
 drag_coefficient = 0.52
@@ -51,16 +131,6 @@ engine_data = SubResource("VehicleEngineData_l7kk7")
 gearbox_data = SubResource("GearboxData_c52e2")
 suspension_data = SubResource("SuspensionData_yivbd")
 aero_data = SubResource("VehicleAerodynamicsData_gi0ev")
-
-[sub_resource type="Curve" id="Curve_ei00m"]
-_limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.21551722, 1), 0.0, 0.0, 0, 0, Vector2(0.49784482, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.65271974), 0.0, 0.0, 0, 0]
-point_count = 5
-
-[sub_resource type="Curve" id="Curve_ugfer"]
-_limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 0.10468469, 0, 0, Vector2(1.0043104, 0.9916319), 0.0, 0.0, 0, 0, Vector2(2, 0.8577407), 0.0, 0.0, 0, 0]
-point_count = 3
 
 [sub_resource type="TireData" id="TireData_8lvy3"]
 friction_lateral = 1.15
@@ -559,130 +629,246 @@ environment = SubResource("Environment_8lvy3")
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
 shadow_enabled = true
 
-[node name="Vehicle" type="Vehicle" parent="." unique_id=357085417 node_paths=PackedStringArray("center_of_mass_marker")]
+[node name="Vehicle2" type="Vehicle" parent="." unique_id=704353569 node_paths=PackedStringArray("center_of_mass_marker")]
+config = SubResource("VehicleConfig_hl4on")
+center_of_mass_marker = NodePath("Marker3D")
+substeps = 2
+mass = 5500.0
+
+[node name="VEHICLE_Army Troop Truck" type="MeshInstance3D" parent="Vehicle2" unique_id=245293515]
+transform = Transform3D(2, 0, 0, 0, -8.742278e-08, 2, 0, -2, -8.742278e-08, 0, 0, 0)
+mesh = ExtResource("2_kkclv")
+skeleton = NodePath("")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Vehicle2" unique_id=1249717901]
+transform = Transform3D(2, 0, 0, 0, -8.742278e-08, 2, 0, -2, -8.742278e-08, 0, 0, 0)
+visible = false
+shape = SubResource("ConvexPolygonShape3D_mt10o")
+
+[node name="Marker3D" type="Marker3D" parent="Vehicle2" unique_id=1993440469]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0064936, -0.27141887)
+
+[node name="Axle" type="Axle" parent="Vehicle2" unique_id=920377586]
+is_steerable = true
+tire_data = SubResource("TireData_2hm57")
+differential_data = SubResource("DifferentialData_ray1q")
+steering_rack_data = SubResource("SteeringRackData_y4awt")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.67081654, 2.154624)
+
+[node name="Wheel" type="Wheel" parent="Vehicle2/Axle" unique_id=311939712]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle/Wheel" unique_id=363612309]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="Wheel2" type="Wheel" parent="Vehicle2/Axle" unique_id=803777144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle/Wheel2" unique_id=108146152]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="Axle2" type="Axle" parent="Vehicle2" unique_id=1217337276]
+drive_share = 0.5
+tire_data = SubResource("TireData_2hm57")
+differential_data = SubResource("DifferentialData_porlw")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.67081654, -1.356319)
+
+[node name="Wheel" type="Wheel" parent="Vehicle2/Axle2" unique_id=1713882358]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle2/Wheel" unique_id=1685950831]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="Wheel2" type="Wheel" parent="Vehicle2/Axle2" unique_id=456911689]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle2/Wheel2" unique_id=103260790]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="Axle3" type="Axle" parent="Vehicle2" unique_id=1356869674]
+drive_share = 0.5
+tire_data = SubResource("TireData_2hm57")
+differential_data = SubResource("DifferentialData_vvvqn")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.67081654, -2.5889378)
+
+[node name="Wheel" type="Wheel" parent="Vehicle2/Axle3" unique_id=1793809291]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle3/Wheel" unique_id=245233450]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="Wheel2" type="Wheel" parent="Vehicle2/Axle3" unique_id=1033840222]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle2/Axle3/Wheel2" unique_id=3448187]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_ray1q")
+skeleton = NodePath("")
+
+[node name="WheelVisuals" type="Node3D" parent="Vehicle2" unique_id=409756319 node_paths=PackedStringArray("vehicle")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6853267, -1.5508447)
+script = ExtResource("3_wheel_visuals")
+vehicle = NodePath("..")
+
+[node name="VehicleTelemetry" type="VehicleTelemetry" parent="Vehicle2" unique_id=1942080586]
+
+[node name="Vehicle1" type="Vehicle" parent="." unique_id=357085417 node_paths=PackedStringArray("center_of_mass_marker")]
 config = SubResource("VehicleConfig_example")
 center_of_mass_marker = NodePath("Marker3D")
 substeps = 2
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6853267, 1.5508447)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.877714, 0.6853267, 10.353979)
 mass = 1500.0
 center_of_mass_mode = 1
 center_of_mass = Vector3(0, -0.05, -0.02)
 linear_damp_mode = 1
 angular_damp_mode = 1
-script = ExtResource("2_8lvy3")
 
-[node name="Axle2" type="Axle" parent="Vehicle" unique_id=278175441]
+[node name="Axle2" type="Axle" parent="Vehicle1" unique_id=278175441]
 is_steerable = true
 tire_data = SubResource("TireData_8lvy3")
 differential_data = SubResource("DifferentialData_8lvy3")
 steering_rack_data = SubResource("SteeringRackData_n51mc")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.090619504, 1.3577945)
 
-[node name="Wheel" type="Wheel" parent="Vehicle/Axle2" unique_id=1145563054]
+[node name="Wheel" type="Wheel" parent="Vehicle1/Axle2" unique_id=1145563054]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.84483075, 0, 0)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle2/Wheel" unique_id=525817576]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle1/Axle2/Wheel" unique_id=525817576]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("CylinderMesh_porlw")
 
-[node name="Wheel2" type="Wheel" parent="Vehicle/Axle2" unique_id=1871255799]
+[node name="Wheel2" type="Wheel" parent="Vehicle1/Axle2" unique_id=1871255799]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.845, 0, 0)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle2/Wheel2" unique_id=841360301]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle1/Axle2/Wheel2" unique_id=841360301]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("CylinderMesh_porlw")
 
-[node name="Axle" type="Axle" parent="Vehicle" unique_id=2062533440]
+[node name="Axle" type="Axle" parent="Vehicle1" unique_id=2062533440]
 drive_share = 1.0
 tire_data = SubResource("TireData_n51mc")
 differential_data = SubResource("DifferentialData_example")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06861514, -1.1780977)
 
-[node name="Wheel" type="Wheel" parent="Vehicle/Axle" unique_id=379914716]
+[node name="Wheel" type="Wheel" parent="Vehicle1/Axle" unique_id=379914716]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.845, 0, 0)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle/Wheel" unique_id=225311224]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle1/Axle/Wheel" unique_id=225311224]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("CylinderMesh_porlw")
 
-[node name="Wheel2" type="Wheel" parent="Vehicle/Axle" unique_id=2123617535]
+[node name="Wheel2" type="Wheel" parent="Vehicle1/Axle" unique_id=2123617535]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.845, 0, 0)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle/Axle/Wheel2" unique_id=1171921634]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Vehicle1/Axle/Wheel2" unique_id=1171921634]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("CylinderMesh_porlw")
 
-[node name="VehicleTelemetry" type="VehicleTelemetry" parent="Vehicle" unique_id=-468373194]
+[node name="VehicleTelemetry" type="VehicleTelemetry" parent="Vehicle1" unique_id=-468373194]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Vehicle" unique_id=150922234]
-transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Vehicle1" unique_id=150922234]
+transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0.043231845, 0)
 shape = SubResource("ConvexPolygonShape3D_n51mc")
 
-[node name="Testarossa" type="Node3D" parent="Vehicle" unique_id=332019998]
+[node name="Testarossa" type="Node3D" parent="Vehicle1" unique_id=332019998]
 
-[node name="HeadLights_down" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=1153290452]
+[node name="HeadLights_down" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=1153290452]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_0mi1v")
 skeleton = NodePath("")
 
-[node name="Headlights" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=523396036]
+[node name="Headlights" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=523396036]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_m7jq1")
 skeleton = NodePath("")
 
-[node name="Vents" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=1770264710]
+[node name="Vents" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=1770264710]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, -0.0020282366, 0)
 mesh = SubResource("ArrayMesh_kgace")
 skeleton = NodePath("")
 
-[node name="body" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=1992184184]
+[node name="body" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=1992184184]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_8uucf")
 skeleton = NodePath("")
 
-[node name="seats_back" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=1896526080]
+[node name="seats_back" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=1896526080]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_diaru")
 skeleton = NodePath("")
 
-[node name="seats_front" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=148254606]
+[node name="seats_front" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=148254606]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_133v6")
 skeleton = NodePath("")
 
-[node name="stoplights" type="MeshInstance3D" parent="Vehicle/Testarossa" unique_id=262252046]
+[node name="stoplights" type="MeshInstance3D" parent="Vehicle1/Testarossa" unique_id=262252046]
 transform = Transform3D(1.49, 0, 0, 0, 8.881092e-08, 1.49, 0, -1.49, 8.881092e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_pupds")
 skeleton = NodePath("")
 
-[node name="Marker3D" type="Marker3D" parent="Vehicle" unique_id=427608312]
+[node name="Marker3D" type="Marker3D" parent="Vehicle1" unique_id=427608312]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06605971, -0.0971117)
 
-[node name="ChaseCamera" type="Camera3D" parent="." unique_id=291821691 node_paths=PackedStringArray("target")]
+[node name="WheelVisuals" type="Node3D" parent="Vehicle1" unique_id=233075573 node_paths=PackedStringArray("vehicle")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6853267, -1.5508447)
+script = ExtResource("3_wheel_visuals")
+vehicle = NodePath("..")
+
+[node name="VehicleController" type="Node" parent="." unique_id=2023098332 node_paths=PackedStringArray("vehicle")]
+script = ExtResource("3_controller")
+vehicle = NodePath("../Vehicle1")
+
+[node name="ChaseCamera1" type="Camera3D" parent="." unique_id=291821691 node_paths=PackedStringArray("target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)
 current = true
 script = ExtResource("1_chasecam")
-target = NodePath("../Vehicle")
+target = NodePath("../Vehicle1")
 distance = 5.0
 height = 2.5
 
-[node name="Control" type="Control" parent="." unique_id=794027967]
+[node name="ChaseCamera2" type="Camera3D" parent="." unique_id=1555204180 node_paths=PackedStringArray("target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)
+script = ExtResource("1_chasecam")
+target = NodePath("../Vehicle2")
+distance = 8.0
+
+[node name="Control" type="Control" parent="." unique_id=794027967 node_paths=PackedStringArray("vehicle")]
 layout_mode = 3
 anchors_preset = 0
-offset_right = 439.0
+offset_left = 9.0
+offset_right = 448.0
 offset_bottom = 628.0
+script = ExtResource("3_telemetry")
+vehicle = NodePath("../Vehicle1")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Control" unique_id=332069818]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = 52.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="TitleLabel" type="Label" parent="Control/VBoxContainer" unique_id=-468467295]
 layout_mode = 2
 text = "-- Drivetrain Telemetry --"
+label_settings = SubResource("LabelSettings_ray1q")
+
+[node name="FPSLabel" type="Label" parent="Control/VBoxContainer" unique_id=376083594]
+layout_mode = 2
+text = "FPS: 0"
 label_settings = SubResource("LabelSettings_ray1q")
 
 [node name="EngineRPMLabel" type="Label" parent="Control/VBoxContainer" unique_id=-468467294]
@@ -851,7 +1037,7 @@ use_collision = true
 size = Vector3(1, 25.481873, 12.8125)
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D" type="CSGCylinder3D" parent="." unique_id=1392779405]
+[node name="CSGCylinder3D" type="CSGCylinder3D" parent="Builds" unique_id=1392779405]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 12.63901, -0.6444527, 8.063956)
 use_collision = true
 radius = 0.25
@@ -859,7 +1045,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D2" type="CSGCylinder3D" parent="." unique_id=1917702000]
+[node name="CSGCylinder3D2" type="CSGCylinder3D" parent="Builds" unique_id=1917702000]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 13.401766, -0.6444527, 8.637197)
 use_collision = true
 radius = 0.25
@@ -867,7 +1053,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D3" type="CSGCylinder3D" parent="." unique_id=738608973]
+[node name="CSGCylinder3D3" type="CSGCylinder3D" parent="Builds" unique_id=738608973]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 14.132921, -0.6444527, 9.203488)
 use_collision = true
 radius = 0.25
@@ -875,7 +1061,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D4" type="CSGCylinder3D" parent="." unique_id=1884848090]
+[node name="CSGCylinder3D4" type="CSGCylinder3D" parent="Builds" unique_id=1884848090]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 14.845928, -0.57082236, 9.7578745)
 use_collision = true
 radius = 0.25
@@ -883,7 +1069,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D5" type="CSGCylinder3D" parent="." unique_id=1256415243]
+[node name="CSGCylinder3D5" type="CSGCylinder3D" parent="Builds" unique_id=1256415243]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 15.452021, -0.57082236, 10.193299)
 use_collision = true
 radius = 0.25
@@ -891,7 +1077,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D6" type="CSGCylinder3D" parent="." unique_id=651318950]
+[node name="CSGCylinder3D6" type="CSGCylinder3D" parent="Builds" unique_id=651318950]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 16.081432, -0.57082236, 10.682582)
 use_collision = true
 radius = 0.25
@@ -899,7 +1085,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D7" type="CSGCylinder3D" parent="." unique_id=1505995612]
+[node name="CSGCylinder3D7" type="CSGCylinder3D" parent="Builds" unique_id=1505995612]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 17.019445, -0.51577425, 11.319475)
 use_collision = true
 radius = 0.25
@@ -907,7 +1093,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D8" type="CSGCylinder3D" parent="." unique_id=1739787333]
+[node name="CSGCylinder3D8" type="CSGCylinder3D" parent="Builds" unique_id=1739787333]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 17.691782, -0.51577425, 11.792574)
 use_collision = true
 radius = 0.25
@@ -915,7 +1101,7 @@ height = 3.0
 smooth_faces = false
 material = SubResource("StandardMaterial3D_wcwec")
 
-[node name="CSGCylinder3D9" type="CSGCylinder3D" parent="." unique_id=2037751859]
+[node name="CSGCylinder3D9" type="CSGCylinder3D" parent="Builds" unique_id=2037751859]
 transform = Transform3D(0.80135876, -0.59818405, 2.6147456e-08, 0, -4.371139e-08, -1, 0.59818405, 0.80135876, -3.5028503e-08, 18.351698, -0.51577425, 12.2705)
 use_collision = true
 radius = 0.25

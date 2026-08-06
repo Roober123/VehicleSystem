@@ -1,14 +1,20 @@
-# Godot auto generated files
+# Godot-generated caches and local state
 *.gen.*
 .godot/
+.import/
+mono_crash.*.json
 
-# Ignore library files but not the gdextension file
+# Build outputs. Keep only the extension manifest and its stable Godot UID.
 /bin/**
-!project/bin/*.gdextension
-/project/bin/windows/*.a
+/project/bin/*
+!/project/bin/*.gdextension
+!/project/bin/*.gdextension.uid
+/build/
+/out/
 
-# Ignore scons database
+# SCons and compiler intermediates
 .sconsign*.dblite
+.sconf_temp/
 
 # Ignore custom.py
 custom.py
@@ -29,6 +35,12 @@ compile_commands.json
 *.dblite
 *.pdb
 *.lib
+*.a
+*.dll
+*.dylib
+*.wasm
+*.exe
+*.pck
 *.config
 *.creator
 *.creator.user
@@ -37,8 +49,26 @@ compile_commands.json
 *.idb
 *.exp
 
-# Other stuff
+# Logs, crash dumps, temporary files, and editor backups
 *.log
+*.log.*
+*.dmp
+*.stackdump
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+*~
+~$*
+
+# Test and language caches
+__pycache__/
+.pytest_cache/
+.cache/
+.coverage
+htmlcov/
 
 # VSCode
 .vscode/*
