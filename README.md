@@ -9,7 +9,7 @@ rotational network, and optional turbo. No exhaust subsystem is part of the
 runtime composition.
 
 ## Features
-- Highly performant, the system can be used with 120 physical hz and no substeps, but they improve stability in complex multi-axle vehicles.
+- Highly performant, the system can be used with 120 physics hz and no substeps, but they improve stability in complex multi-axle vehicles.
 - Configurable engine torque curve, idle/redline behavior, braking, and turbo.
 - Command-based gearbox shifting with automatic and semi-automatic modes.
 - Direct `RotationalNetwork` configuration through value-owned `DrivenAxle` and
