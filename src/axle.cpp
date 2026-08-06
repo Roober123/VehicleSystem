@@ -44,13 +44,18 @@ void Axle::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
     find_children_wheels();
-    if (steering_rack_data != nullptr) {
+    reapply_resources();
+}
+
+void Axle::reapply_resources() {
+    if (steering_rack_data != nullptr)
         steering_rack.load(steering_rack_data);
-    }
-    // Apply tire data to wheels
+
     if (tire_data != nullptr) {
-        for (auto* wh : wheels)
-            wh->set_tire(tire_data);
+        for (Wheel *wheel : wheels) {
+            if (wheel != nullptr)
+                wheel->set_tire(tire_data);
+        }
     }
 }
 

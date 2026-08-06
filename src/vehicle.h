@@ -49,6 +49,8 @@ class Vehicle : public RigidBody3D {
     int substeps = 1;
     bool initialized = false;
 
+    bool initialize_runtime();
+
 protected:
     static void _bind_methods();
 
@@ -75,6 +77,10 @@ public:
     bool get_abs_enabled() const { return abs_enabled; }
     void set_tcs_enabled(bool value);
     bool get_tcs_enabled() const { return tcs_enabled; }
+
+    void set_gearbox_automatic(bool value);
+    bool get_gearbox_automatic() const;
+    bool restart();
 
     void shift_up();
     void shift_down();

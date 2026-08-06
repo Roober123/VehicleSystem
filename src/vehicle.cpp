@@ -48,6 +48,12 @@ void Vehicle::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_tcs_enabled"), &Vehicle::get_tcs_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tcs_enabled"), "set_tcs_enabled", "get_tcs_enabled");
 
+    ClassDB::bind_method(D_METHOD("set_gearbox_automatic", "value"),
+                         &Vehicle::set_gearbox_automatic);
+    ClassDB::bind_method(D_METHOD("get_gearbox_automatic"),
+                         &Vehicle::get_gearbox_automatic);
+    ClassDB::bind_method(D_METHOD("restart"), &Vehicle::restart);
+
     ClassDB::bind_method(D_METHOD("set_substeps", "value"), &Vehicle::set_substeps);
     ClassDB::bind_method(D_METHOD("get_substeps"), &Vehicle::get_substeps);
     ADD_PROPERTY(PropertyInfo(Variant::INT, "substeps", PROPERTY_HINT_RANGE, "1,1024,1"),
@@ -61,10 +67,12 @@ void Vehicle::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
 
-    // Setup is deliberately one-shot. Any invalid composition leaves the
-    // vehicle uninitialized and therefore inert for the remainder of its life.
+    initialize_runtime();
+}
+
+bool Vehicle::initialize_runtime() {
     if (initialized)
-        return;
+        return true;
 
     std::vector<Axle *> setup_axles;
     TypedArray<Node> children = get_children();
@@ -78,7 +86,7 @@ void Vehicle::_ready() {
     String setup_error;
     if (!VehicleSetupValidation::validate(config, setup_axles, setup_error)) {
         UtilityFunctions::printerr(String("Vehicle setup failed: ") + setup_error);
-        return;
+        return false;
     }
 
     set_linear_damp_mode(DampMode::DAMP_MODE_REPLACE);
@@ -95,17 +103,19 @@ void Vehicle::_ready() {
         set_center_of_mass(marker_local_position);
     }
 
+    drivetrain.reset_runtime_state();
     running_gear.setup(setup_axles, get_mass(), config->get_suspension_data(),
                        config->get_aero_data());
     String drivetrain_error;
     if (!drivetrain.setup(config, running_gear.get_axles(), drivetrain_error)) {
         UtilityFunctions::printerr(String("Vehicle drivetrain setup failed: ") +
                                     drivetrain_error);
-        return;
+        return false;
     }
 
     initialized = true;
     emit_signal("vehicle_ready");
+    return true;
 }
 
 void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
@@ -182,11 +192,36 @@ void Vehicle::set_tcs_enabled(bool value) {
 }
 
 void Vehicle::set_config(const Ref<VehicleConfig> &value) {
-    if (initialized) {
-        UtilityFunctions::printerr("Vehicle config cannot be replaced after initialization.");
-        return;
-    }
     config = value;
+}
+
+void Vehicle::set_gearbox_automatic(bool value) {
+    drivetrain.set_gearbox_automatic(value);
+}
+
+bool Vehicle::get_gearbox_automatic() const {
+    return drivetrain.get_gearbox_automatic();
+}
+
+bool Vehicle::restart() {
+    if (Engine::get_singleton()->is_editor_hint())
+        return false;
+
+    // Inertness is committed before any validation or setup work.  A failed
+    // restart must never leave the previous runtime active.
+    initialized = false;
+    const Transform3D preserved_transform = get_global_transform();
+    const Vector3 preserved_linear_velocity = get_linear_velocity();
+    const Vector3 preserved_angular_velocity = get_angular_velocity();
+
+    const bool success = initialize_runtime();
+
+    // Setup does not intentionally respawn a body.  Restore these values even
+    // on failure so restart cannot alter the rigid-body state as a side effect.
+    set_global_transform(preserved_transform);
+    set_linear_velocity(preserved_linear_velocity);
+    set_angular_velocity(preserved_angular_velocity);
+    return success;
 }
 
 void Vehicle::shift_up() {

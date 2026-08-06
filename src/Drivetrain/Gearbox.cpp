@@ -23,6 +23,8 @@ void Gearbox::configure(const Ref<GearboxData> &data) {
     upshift_ratio = data->get_upshift_rpm();
     downshift_ratio = data->get_downshift_rpm();
     shift_time = data->get_shift_time();
+    clutch_engage_speed = data->get_clutch_engage_speed();
+    clutch_disengage_speed = data->get_clutch_disengage_speed();
     automatic = data->get_auto_mode();
     driveshaft->set_drag(data->get_driveshaft_drag());
 
@@ -37,9 +39,9 @@ void Gearbox::configure(const Ref<GearboxData> &data) {
 }
 
 void Gearbox::compute_phase_times() {
-    disengage_duration = shift_time * real_t{0.4};
+    // Shift rates own clutch phase progress.  Keep shift_time as the gear
+    // change dwell that occurs while the clutch is fully open.
     change_duration = shift_time * real_t{0.2};
-    reengage_duration = shift_time * real_t{0.4};
 }
 
 real_t Gearbox::get_effective_ratio() const {
@@ -139,7 +141,7 @@ void Gearbox::update_clutch_logic(real_t dt, real_t brake_input, real_t throttle
     case ShiftState::Disengaging: {
         shift_timer += dt;
         const real_t t = std::clamp<real_t>(
-            shift_timer / disengage_duration, real_t{0.0}, real_t{1.0});
+            shift_timer * clutch_disengage_speed, real_t{0.0}, real_t{1.0});
         clutch_engagement = real_t{1.0} - smooth_step(t);
         if (t >= real_t{1.0}) {
             clutch_engagement = real_t{0.0};
@@ -160,7 +162,7 @@ void Gearbox::update_clutch_logic(real_t dt, real_t brake_input, real_t throttle
     case ShiftState::ReEngaging: {
         shift_timer += dt;
         const real_t t = std::clamp<real_t>(
-            shift_timer / reengage_duration, real_t{0.0}, real_t{1.0});
+            shift_timer * clutch_engage_speed, real_t{0.0}, real_t{1.0});
         clutch_engagement = smooth_step(t);
         if (t >= real_t{1.0}) {
             clutch_engagement = real_t{1.0};

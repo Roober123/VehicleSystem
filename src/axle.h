@@ -60,6 +60,10 @@ public:
     void set_steering_rack_data(const Ref<SteeringRackData> &p_data) { steering_rack_data = p_data; }
     Ref<SteeringRackData> get_steering_rack_data() const { return steering_rack_data; }
 
+    /// Reapply the current part resources to the copied runtime models.
+    /// Topology is intentionally unchanged; this is safe to call on restart.
+    void reapply_resources();
+
     void compute_suspension_parameters(real_t mass, const Ref<SuspensionData>& s);
 
     void update_physics(const Vector3 &com_global, const Vector3 &linear_velocity, const Vector3 &angular_velocity);

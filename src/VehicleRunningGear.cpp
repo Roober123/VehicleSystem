@@ -14,8 +14,10 @@ void VehicleRunningGear::setup(const std::vector<Axle *> &setup_axles,
         axles.push_back(axle);
 
     const real_t mass_per_axle = mass / static_cast<real_t>(axles.size());
-    for (Axle *axle : axles)
+    for (Axle *axle : axles) {
+        axle->reapply_resources();
         axle->compute_suspension_parameters(mass_per_axle, suspension);
+    }
 
     aerodynamics.load_parameters(aero);
     compute_axle_dimensions();

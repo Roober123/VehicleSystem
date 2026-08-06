@@ -4,7 +4,7 @@
 		Configuration data for a vehicle's gearbox and clutch.
 	</brief_description>
 	<description>
-		GearboxData is a [Resource] that defines gear ratios, final drive ratio, and clutch maximum torque for a vehicle's drivetrain. Used by [Vehicle] to configure its internal clutch and gearbox simulation.
+		GearboxData is a [Resource] that defines gear ratios, final drive ratio, and clutch maximum torque for a vehicle's drivetrain. Vehicle copies these values during initialization or [method Vehicle.restart]. [member auto_mode] is the initial/restart baseline; use [method Vehicle.set_gearbox_automatic] and [method Vehicle.get_gearbox_automatic] for live mode changes.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -65,13 +65,39 @@
 			<return type="void" />
 			<param index="0" name="value" type="float" />
 			<description>
-				Sets the duration of a gear change in seconds. Controls how long the clutch takes to disengage/re-engage during shifts.
+				Sets the gear-change timing value in seconds. Twenty percent of this value is used as the clutch-open gear-change dwell; clutch phase rates are configured separately with [member clutch_disengage_speed] and [member clutch_engage_speed].
 			</description>
 		</method>
 		<method name="get_shift_time" qualifiers="">
 			<return type="float" />
 			<description>
-				Returns the gear change duration in seconds.
+				Returns the gear-change timing value in seconds; twenty percent is used as the clutch-open gear-change dwell.
+			</description>
+		</method>
+		<method name="set_clutch_engage_speed" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the clutch engagement phase rate in engagement fraction per second. Lower values make the engagement phase longer.
+			</description>
+		</method>
+		<method name="get_clutch_engage_speed" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the clutch engagement phase rate in engagement fraction per second.
+			</description>
+		</method>
+		<method name="set_clutch_disengage_speed" qualifiers="">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<description>
+				Sets the clutch disengagement phase rate in engagement fraction per second. Lower values make the disengagement phase longer.
+			</description>
+		</method>
+		<method name="get_clutch_disengage_speed" qualifiers="">
+			<return type="float" />
+			<description>
+				Returns the clutch disengagement phase rate in engagement fraction per second.
 			</description>
 		</method>
 		<method name="set_upshift_rpm" qualifiers="">
@@ -104,13 +130,13 @@
 			<return type="void" />
 			<param index="0" name="value" type="bool" />
 			<description>
-				If true, gearbox operates in fully automatic mode. If false, semi-automatic mode where the user controls gear changes but clutch handling is automatic.
+				Sets the automatic/manual mode copied as the gearbox's initial and restart baseline. It does not change an already configured Vehicle until [method Vehicle.restart].
 			</description>
 		</method>
 		<method name="get_auto_mode" qualifiers="">
 			<return type="bool" />
 			<description>
-				Returns whether the gearbox is in automatic mode.
+				Returns the automatic/manual mode used as the gearbox's initial and restart baseline.
 			</description>
 		</method>
 	</methods>
@@ -128,7 +154,13 @@
 			Reverse gear ratio. Negative value drives the vehicle backward.
 		</member>
 		<member name="shift_time" type="float" setter="set_shift_time" getter="get_shift_time" default="0.25">
-			Duration of a gear change in seconds.
+			Gear-change timing value in seconds. Twenty percent is used as the clutch-open gear-change dwell; it does not set clutch phase rates.
+		</member>
+		<member name="clutch_engage_speed" type="float" setter="set_clutch_engage_speed" getter="get_clutch_engage_speed" default="10.0">
+			Clutch engagement rate in engagement fraction per second. Lower values make this phase longer.
+		</member>
+		<member name="clutch_disengage_speed" type="float" setter="set_clutch_disengage_speed" getter="get_clutch_disengage_speed" default="10.0">
+			Clutch disengagement rate in engagement fraction per second. Lower values make this phase longer.
 		</member>
 		<member name="upshift_rpm" type="float" setter="set_upshift_rpm" getter="get_upshift_rpm" default="3500.0">
 			Normalized engine-RPM ratio threshold for automatic upshifting.
@@ -137,7 +169,7 @@
 			Normalized engine-RPM ratio threshold for automatic downshifting.
 		</member>
 		<member name="auto_mode" type="bool" setter="set_auto_mode" getter="get_auto_mode" default="true">
-			If true, gearbox operates in fully automatic mode. If false, semi-automatic mode.
+			Automatic/manual mode copied during Vehicle initialization or restart. Use [method Vehicle.set_gearbox_automatic] and [method Vehicle.get_gearbox_automatic] for live changes.
 		</member>
 		<member name="driveshaft_drag" type="float" setter="set_driveshaft_drag" getter="get_driveshaft_drag" default="0.05">
 			Rotational drag applied to the driveshaft. Higher values smooth out drivetrain oscillations and reduce overshoot.

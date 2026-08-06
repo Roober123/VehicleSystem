@@ -37,6 +37,16 @@ public:
     const Gearbox &get_gearbox() const { return gearbox; }
     const RotationalBody &get_driveshaft() const { return drive_shaft; }
 
+    void set_gearbox_automatic(bool value) { gearbox.set_automatic(value); }
+    bool get_gearbox_automatic() const { return gearbox.is_automatic(); }
+
+    /// Clear value-owned shaft state before a fresh setup transaction.  The
+    /// engine and gearbox are replaced/configured by setup itself.
+    void reset_runtime_state() {
+        drive_shaft.set_angular_velocity(real_t{0.0});
+        drive_shaft.clear_torque();
+    }
+
     void set_throttle(real_t value) { engine.throttle = value; }
     void handle_auto_gearbox(real_t speed_kph, real_t brake_input, real_t throttle_input);
     void update_shifting_logic(real_t dt) { gearbox.update_shifting_logic(dt); }

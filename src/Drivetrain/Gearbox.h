@@ -21,6 +21,8 @@ class Gearbox {
     real_t upshift_ratio = 0.0;
     real_t downshift_ratio = 0.0;
     real_t shift_time = 0.0;
+    real_t clutch_engage_speed = 10.0;
+    real_t clutch_disengage_speed = 10.0;
     bool automatic = true;
 
     int current_gear = 0;
@@ -37,9 +39,7 @@ class Gearbox {
     real_t clutch_engagement = 0.0;
     real_t shift_timer = 0.0;
     real_t shift_cooldown = 0.0;
-    real_t disengage_duration = 0.0;
     real_t change_duration = 0.0;
-    real_t reengage_duration = 0.0;
 
     void compute_phase_times();
     void start_shift(int gear);
@@ -62,6 +62,13 @@ public:
 
     void shift_up();
     void shift_down();
+    /// Switches command mode without changing the current gear or an active
+    /// clutch/gear-change phase.  Any queued manual direction belongs to the
+    /// previous mode and is therefore discarded.
+    void set_automatic(bool value) {
+        automatic = value;
+        shift_input = 0;
+    }
     bool is_automatic() const { return automatic; }
     bool is_shifting() const { return state != ShiftState::Idle; }
 

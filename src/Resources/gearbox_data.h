@@ -14,6 +14,8 @@ class GearboxData : public Resource {
     real_t reverse_ratio = -3.0;    // Negative for backward motion
 
     real_t shift_time = 0.25;       
+    real_t clutch_engage_speed = 10.0;
+    real_t clutch_disengage_speed = 10.0;
     real_t upshift_rpm_ratio = 0.8;    
     real_t downshift_rpm_ratio = 0.25;  
     bool auto_mode = true;
@@ -41,6 +43,12 @@ public:
 
     void set_shift_time(real_t p_value);
     real_t get_shift_time() const;
+
+    void set_clutch_engage_speed(real_t p_value);
+    real_t get_clutch_engage_speed() const;
+
+    void set_clutch_disengage_speed(real_t p_value);
+    real_t get_clutch_disengage_speed() const;
 
     void set_upshift_rpm(real_t p_value);
     real_t get_upshift_rpm() const;

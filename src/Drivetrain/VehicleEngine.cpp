@@ -63,6 +63,16 @@ void VehicleEngine::accumulate_torque(real_t dt) {
 		RotationalBody::add_torque(-brake_torque);
 	}
 
+	// At closed throttle, feed the configured idle speed's rotational drag
+	// forward.  This cancels the inherited RotationalBody drag exactly at the
+	// idle target; the proportional controller below still supplies recovery
+	// torque whenever the engine falls under target speed.
+	if (effective_throttle < real_t{0.01} && rpm <= idle_rpm) {
+		constexpr real_t rpm_to_ang = 2.0 * Math_PI / 60.0;
+		const real_t idle_feedforward = drag * idle_rpm * rpm_to_ang;
+		RotationalBody::add_torque(idle_feedforward);
+	}
+
 	// Idle controller
 	if (rpm < idle_rpm) {
 		real_t idle_torque = max_torque * real_t{0.1} * (real_t{1.0} - rpm / idle_rpm);

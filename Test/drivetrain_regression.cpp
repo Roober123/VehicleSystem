@@ -892,6 +892,16 @@ void advance_shift(Gearbox &gearbox, real_t dt, int steps) {
 }
 
 void test_gearbox(TestState &state) {
+    Ref<GearboxData> speed_defaults = memnew(GearboxData);
+    state.expect(near(speed_defaults->get_clutch_engage_speed(), real_t{10.0}) &&
+                         near(speed_defaults->get_clutch_disengage_speed(), real_t{10.0}),
+                 "GearboxData clutch phase speed defaults are ten units per second");
+    speed_defaults->set_clutch_engage_speed(real_t{4.5});
+    speed_defaults->set_clutch_disengage_speed(real_t{17.25});
+    state.expect(near(speed_defaults->get_clutch_engage_speed(), real_t{4.5}) &&
+                         near(speed_defaults->get_clutch_disengage_speed(), real_t{17.25}),
+                 "GearboxData clutch phase speed setters round-trip authored values");
+
     VehicleEngine engine(make_engine_data());
     engine.set_angular_velocity(rpm_to_omega(real_t{2000.0}));
     RotationalBody shaft;
@@ -907,7 +917,7 @@ void test_gearbox(TestState &state) {
     gearbox.update_clutch_logic(real_t{0.01}, real_t{0.0}, real_t{1.0});
     state.expect(gearbox.is_shifting() && gearbox.get_clutch_engagement() < real_t{1.0},
                  "Gearbox manual shift enters disengaging phase");
-    advance_shift(gearbox, real_t{0.01}, 14);
+    advance_shift(gearbox, real_t{0.01}, 24);
     state.expect(gearbox.get_current_gear() == 1 && !gearbox.is_shifting() &&
                      near(gearbox.get_effective_ratio(), real_t{6.0}) &&
                      near(gearbox.get_clutch_engagement(), real_t{1.0}),
@@ -915,19 +925,19 @@ void test_gearbox(TestState &state) {
 
     gearbox.shift_up();
     gearbox.update_shifting_logic(real_t{0.01});
-    advance_shift(gearbox, real_t{0.01}, 14);
+    advance_shift(gearbox, real_t{0.01}, 24);
     state.expect(gearbox.get_current_gear() == 2 && near(gearbox.get_effective_ratio(), real_t{3.0}),
                  "Gearbox second manual selection");
 
     gearbox.select_neutral();
     gearbox.update_shifting_logic(real_t{0.01});
-    advance_shift(gearbox, real_t{0.01}, 14);
+    advance_shift(gearbox, real_t{0.01}, 24);
     state.expect(gearbox.get_current_gear() == 0 && near(gearbox.get_effective_ratio(), real_t{0.0}),
                  "Gearbox neutral selection");
 
     gearbox.select_reverse();
     gearbox.update_shifting_logic(real_t{0.01});
-    advance_shift(gearbox, real_t{0.01}, 14);
+    advance_shift(gearbox, real_t{0.01}, 24);
     state.expect(gearbox.get_current_gear() == -1 && near(gearbox.get_effective_ratio(), real_t{-6.0}),
                  "Gearbox reverse selection and signed ratio");
 
@@ -944,6 +954,106 @@ void test_gearbox(TestState &state) {
     for (int i = 0; i < 25; ++i)
         automatic.update_shifting_logic(real_t{0.01});
     state.expect(automatic.is_shifting(), "Gearbox automatic upshift threshold");
+
+    // Mode changes are command-policy changes, not drivetrain resets.  An
+    // active shift must finish under the new policy while the current gear is
+    // retained, and a queued manual command from the old policy must be
+    // discarded.
+    VehicleEngine mode_engine(make_engine_data());
+    mode_engine.set_angular_velocity(rpm_to_omega(real_t{2000.0}));
+    RotationalBody mode_shaft;
+    Gearbox mode_probe;
+    mode_probe.set_bodies(mode_engine, mode_shaft);
+    mode_probe.configure(make_gearbox_data(false));
+    mode_probe.shift_up();
+    mode_probe.update_shifting_logic(real_t{0.01});
+    state.expect(mode_probe.is_shifting() && mode_probe.get_current_gear() == 0,
+                 "Gearbox manual command starts an active shift before mode switch");
+    mode_probe.set_automatic(true);
+    state.expect(mode_probe.is_automatic() && mode_probe.is_shifting() &&
+                         mode_probe.get_current_gear() == 0,
+                 "Gearbox manual-to-automatic switch preserves active shift and gear");
+    for (int i = 0; mode_probe.is_shifting() && i < 100; ++i)
+        mode_probe.update_clutch_logic(real_t{0.01}, real_t{0.0}, real_t{1.0});
+    state.expect(mode_probe.get_current_gear() == 1 && !mode_probe.is_shifting(),
+                 "Gearbox active shift completes after manual-to-automatic switch");
+    mode_probe.set_automatic(false);
+    mode_probe.shift_down();
+    mode_probe.set_automatic(true);
+    mode_probe.update_shifting_logic(real_t{0.01});
+    state.expect(mode_probe.is_automatic() && !mode_probe.is_shifting() &&
+                         mode_probe.get_current_gear() == 1,
+                 "Gearbox mode switch clears stale queued manual input");
+
+    VehicleEngine reverse_mode_engine(make_engine_data());
+    reverse_mode_engine.throttle = real_t{1.0};
+    RotationalBody reverse_mode_shaft;
+    Gearbox reverse_mode_probe;
+    reverse_mode_probe.set_bodies(reverse_mode_engine, reverse_mode_shaft);
+    reverse_mode_probe.configure(make_gearbox_data(true));
+    reverse_mode_probe.update_shifting_logic(real_t{0.01});
+    reverse_mode_probe.set_automatic(false);
+    state.expect(!reverse_mode_probe.is_automatic() && reverse_mode_probe.is_shifting() &&
+                         reverse_mode_probe.get_current_gear() == 0,
+                 "Gearbox automatic-to-manual switch preserves active shift and gear");
+    for (int i = 0; reverse_mode_probe.is_shifting() && i < 100; ++i)
+        reverse_mode_probe.update_clutch_logic(real_t{0.01}, real_t{0.0}, real_t{1.0});
+    state.expect(reverse_mode_probe.get_current_gear() == 1 && !reverse_mode_probe.is_shifting(),
+                 "Gearbox active shift completes after automatic-to-manual switch");
+
+    // Engage and disengage rates are independent phase controls.  Use an
+    // engine RPM above the low-speed clutch safety clamp, then count the
+    // fixed-step calls required by each phase and verify both shifts finish.
+    auto measure_shift = [](real_t engage_speed, real_t disengage_speed) {
+        VehicleEngine phase_engine(make_engine_data());
+        phase_engine.set_angular_velocity(rpm_to_omega(real_t{2000.0}));
+        RotationalBody phase_shaft;
+        Gearbox phase_gearbox;
+        phase_gearbox.set_bodies(phase_engine, phase_shaft);
+        Ref<GearboxData> phase_data = make_gearbox_data(false);
+        phase_data->set_shift_time(real_t{0.1});
+        phase_data->set_clutch_engage_speed(engage_speed);
+        phase_data->set_clutch_disengage_speed(disengage_speed);
+        phase_gearbox.configure(phase_data);
+        phase_gearbox.shift_up();
+        phase_gearbox.update_shifting_logic(real_t{0.01});
+
+        int disengage_steps = 0;
+        while (phase_gearbox.get_current_gear() == 0 && disengage_steps < 1000) {
+            phase_gearbox.update_clutch_logic(real_t{0.01}, real_t{0.0}, real_t{1.0});
+            ++disengage_steps;
+        }
+
+        int engage_steps = 0;
+        bool reengaging = false;
+        int total_steps = disengage_steps;
+        while (phase_gearbox.is_shifting() && total_steps < 1000) {
+            phase_gearbox.update_clutch_logic(real_t{0.01}, real_t{0.0}, real_t{1.0});
+            ++total_steps;
+            if (!reengaging && phase_gearbox.get_clutch_engagement() > real_t{0.0}) {
+                reengaging = true;
+                engage_steps = 1;
+            } else if (reengaging) {
+                ++engage_steps;
+            }
+        }
+        return std::array<int, 3>{disengage_steps, engage_steps, total_steps};
+    };
+
+    const std::array<int, 3> slow_disengage_fast_engage =
+            measure_shift(real_t{20.0}, real_t{5.0});
+    const std::array<int, 3> fast_disengage_slow_engage =
+            measure_shift(real_t{5.0}, real_t{20.0});
+    state.expect(slow_disengage_fast_engage[0] > fast_disengage_slow_engage[0] &&
+                         slow_disengage_fast_engage[1] < fast_disengage_slow_engage[1] &&
+                         slow_disengage_fast_engage[2] > 0 &&
+                         fast_disengage_slow_engage[2] > 0,
+                 "Gearbox authored clutch rates produce distinct phase timing");
+    state.expect(slow_disengage_fast_engage[0] > 0 &&
+                         fast_disengage_slow_engage[0] > 0 &&
+                         slow_disengage_fast_engage[2] < 1000 &&
+                         fast_disengage_slow_engage[2] < 1000,
+                 "Gearbox authored-rate shifts complete within bounded time");
 }
 
 void test_turbo(TestState &state) {
@@ -1084,6 +1194,35 @@ void test_turbo(TestState &state) {
 }
 
 void test_engine(TestState &state) {
+    VehicleEngine idle_engine(make_engine_data());
+    const real_t idle_omega = rpm_to_omega(idle_engine.get_idle_rpm());
+    const real_t idle_dt = real_t{0.05};
+    idle_engine.set_angular_velocity(idle_omega);
+    idle_engine.throttle = real_t{0.0};
+    idle_engine.accumulate_torque(idle_dt);
+    const real_t expected_idle_feedforward = real_t{0.5} * idle_omega;
+    state.expect(near(idle_engine.get_pending_torque(), expected_idle_feedforward) &&
+                         near(idle_engine.get_effective_torque(), real_t{0.0}) &&
+                         near(idle_engine.predict_angular_velocity(idle_dt), idle_omega),
+                 "VehicleEngine idle feed-forward cancels inherited drag at target");
+    idle_engine.integrate(idle_dt);
+    state.expect(near(idle_engine.get_angular_velocity(), idle_omega) &&
+                         near(idle_engine.get_rpm(), idle_engine.get_idle_rpm()),
+                 "VehicleEngine integration holds configured idle speed");
+
+    idle_engine.set_angular_velocity(rpm_to_omega(real_t{800.0}));
+    const real_t initial_recovery_rpm = idle_engine.get_rpm();
+    for (int i = 0; i < 3000; ++i) {
+        idle_engine.clear_torque();
+        idle_engine.throttle = real_t{0.0};
+        idle_engine.accumulate_torque(real_t{0.01});
+        idle_engine.integrate(real_t{0.01});
+    }
+    const real_t recovery_rpm = idle_engine.get_rpm();
+    state.expect(recovery_rpm > real_t{990.0} &&
+                         recovery_rpm > initial_recovery_rpm,
+                 "VehicleEngine below-idle recovery converges without steady-state droop");
+
     VehicleEngine engine(make_engine_data());
     engine.set_angular_velocity(rpm_to_omega(real_t{700.0}));
     engine.throttle = real_t{0.0};
@@ -1551,6 +1690,143 @@ void test_vehicle_center_of_mass_marker(TestState &state) {
     memdelete(manual_vehicle);
 }
 
+void test_vehicle_runtime_restart(TestState &state) {
+    SceneTree *scene_tree = Object::cast_to<SceneTree>(
+            Engine::get_singleton()->get_main_loop());
+    Window *scene_root = scene_tree != nullptr ? scene_tree->get_root() : nullptr;
+    state.expect(scene_root != nullptr,
+                 "Vehicle restart fixture has a live SceneTree root");
+    if (scene_root == nullptr)
+        return;
+
+    Ref<VehicleConfig> initial_config = make_valid_config();
+    Ref<VehicleConfig> replacement_config = make_valid_config();
+    replacement_config->get_engine_data()->set_idle_rpm(real_t{1800.0});
+    replacement_config->get_engine_data()->set_redline_rpm(real_t{5000.0});
+    replacement_config->get_gearbox_data()->set_auto_mode(true);
+
+    Ref<SteeringRackData> rack_data = memnew(SteeringRackData);
+    rack_data->set_inertia(real_t{1.0});
+    rack_data->set_damping(real_t{0.0});
+    rack_data->set_friction_coefficient(real_t{0.0});
+    rack_data->set_max_angle(real_t{35.0});
+    rack_data->set_proportional_gain(real_t{1000.0});
+    rack_data->set_derivative_gain(real_t{0.0});
+    rack_data->set_sat_gain(real_t{0.0});
+
+    Vehicle *vehicle = memnew(Vehicle);
+    vehicle->set_config(initial_config);
+    vehicle->set_mass(real_t{1200.0});
+    Axle *axle = make_unready_axle(real_t{1.0});
+    axle->set_steerable(true);
+    axle->set_steering_rack_data(rack_data);
+    vehicle->add_child(axle);
+    scene_root->add_child(vehicle);
+
+    state.expect(!vehicle->get_gearbox_automatic(),
+                 "Vehicle public gearbox mode starts from copied manual config");
+    vehicle->set_gearbox_automatic(true);
+    state.expect(vehicle->get_gearbox_automatic(),
+                 "Vehicle public gearbox mode setter enables automatic mode");
+    vehicle->set_gearbox_automatic(false);
+    state.expect(!vehicle->get_gearbox_automatic(),
+                 "Vehicle public gearbox mode setter disables automatic mode");
+
+    const VehicleTelemetrySnapshot initial_snapshot = vehicle->get_telemetry_snapshot();
+    state.expect(near(initial_snapshot.engine_rpm, real_t{1000.0}),
+                 "Vehicle runtime copies initial engine values at setup");
+
+    const Transform3D preserved_transform(
+            Basis(Vector3(0.0, 1.0, 0.0), real_t{0.35}),
+            Vector3(4.0, 2.0, -6.0));
+    const Vector3 preserved_linear(real_t{3.0}, real_t{-1.0}, real_t{2.0});
+    const Vector3 preserved_angular(real_t{0.2}, real_t{-0.4}, real_t{0.6});
+    vehicle->set_global_transform(preserved_transform);
+    vehicle->set_linear_velocity(preserved_linear);
+    vehicle->set_angular_velocity(preserved_angular);
+
+    Callable first_ready = Callable(vehicle, "set_meta").bind(
+            StringName("restart_ready_first"), true);
+    state.expect(vehicle->connect("vehicle_ready", first_ready) == OK,
+                 "Vehicle restart fixture connects vehicle_ready observer");
+
+    vehicle->set_config(replacement_config);
+    const VehicleTelemetrySnapshot before_restart = vehicle->get_telemetry_snapshot();
+    state.expect(near(before_restart.engine_rpm, real_t{1000.0}) &&
+                         !vehicle->get_gearbox_automatic(),
+                 "Replacing Vehicle config leaves copied live engine and gearbox unchanged");
+
+    axle->get_tire_data()->set_radius(real_t{0.6});
+    rack_data->set_max_angle(real_t{5.0});
+    state.expect(vehicle->restart() && vehicle->has_meta("restart_ready_first"),
+                 "Vehicle restart applies replacement config and emits vehicle_ready");
+
+    const VehicleTelemetrySnapshot after_restart = vehicle->get_telemetry_snapshot();
+    const Transform3D restored_transform = vehicle->get_global_transform();
+    const Vector3 restored_linear = vehicle->get_linear_velocity();
+    const Vector3 restored_angular = vehicle->get_angular_velocity();
+    state.expect(near(after_restart.engine_rpm, real_t{1800.0}) &&
+                         vehicle->get_gearbox_automatic(),
+                 "Successful Vehicle restart applies new engine and gearbox values");
+    state.expect(near(restored_transform.origin.x, preserved_transform.origin.x) &&
+                         near(restored_transform.origin.y, preserved_transform.origin.y) &&
+                         near(restored_transform.origin.z, preserved_transform.origin.z) &&
+                         near(restored_linear.x, preserved_linear.x) &&
+                         near(restored_linear.y, preserved_linear.y) &&
+                         near(restored_linear.z, preserved_linear.z) &&
+                         near(restored_angular.x, preserved_angular.x) &&
+                         near(restored_angular.y, preserved_angular.y) &&
+                         near(restored_angular.z, preserved_angular.z),
+                 "Vehicle restart preserves transform and linear/angular velocity");
+
+    const std::vector<Axle *> &runtime_axles = vehicle->get_wheel_views();
+    state.expect(runtime_axles.size() == 1 && runtime_axles[0] == axle &&
+                         axle->get_wheels().size() == 2,
+                 "Vehicle restart preserves authored axle topology");
+    if (runtime_axles.size() == 1 && axle->get_wheels().size() == 2) {
+        Wheel *wheel = axle->get_wheels()[0];
+        wheel->add_drive_torque(real_t{9.0});
+        wheel->integrate_rotation(real_t{0.1});
+        state.expect(near(wheel->get_angular_velocity(), real_t{0.25}),
+                     "Vehicle restart reapplies in-place authored tire radius");
+
+        axle->solve_steering(real_t{1.0}, real_t{0.1}, real_t{0.0});
+        state.expect(axle->get_steer_angle() <= kPi / real_t{36.0} + real_t{1e-4},
+                     "Vehicle restart reapplies in-place authored steering rack limits");
+    }
+
+    vehicle->disconnect("vehicle_ready", first_ready);
+    Callable second_ready = Callable(vehicle, "set_meta").bind(
+            StringName("restart_ready_second"), true);
+    state.expect(vehicle->connect("vehicle_ready", second_ready) == OK,
+                 "Vehicle restart fixture reconnects vehicle_ready observer");
+
+    Ref<GearboxData> valid_replacement_gearbox =
+            replacement_config->get_gearbox_data();
+    Ref<VehicleConfig> invalid_config = replacement_config;
+    invalid_config->set_gearbox_data(Ref<GearboxData>());
+    vehicle->set_config(invalid_config);
+    const bool invalid_restart = vehicle->restart();
+    const Vector3 inert_linear = vehicle->get_linear_velocity();
+    const Vector3 inert_angular = vehicle->get_angular_velocity();
+    state.expect(!invalid_restart && !vehicle->has_meta("restart_ready_second") &&
+                         near(inert_linear.x, preserved_linear.x) &&
+                         near(inert_linear.y, preserved_linear.y) &&
+                         near(inert_linear.z, preserved_linear.z) &&
+                         near(inert_angular.x, preserved_angular.x) &&
+                         near(inert_angular.y, preserved_angular.y) &&
+                         near(inert_angular.z, preserved_angular.z),
+                 "Invalid Vehicle restart fails inertly without emitting ready");
+
+    invalid_config->set_gearbox_data(valid_replacement_gearbox);
+    vehicle->set_config(invalid_config);
+    state.expect(vehicle->restart() && vehicle->has_meta("restart_ready_second"),
+                 "Corrected Vehicle config restarts successfully and emits vehicle_ready again");
+
+    scene_root->remove_child(vehicle);
+    memdelete(vehicle);
+}
+
 void test_vehicle_tire_telemetry(TestState &state) {
     SceneTree *scene_tree = Object::cast_to<SceneTree>(
             Engine::get_singleton()->get_main_loop());
@@ -1755,6 +2031,7 @@ bool DrivetrainRegression::run() {
     test_skid_marks(state);
     test_steering_sat(state);
     test_vehicle_center_of_mass_marker(state);
+    test_vehicle_runtime_restart(state);
     test_vehicle_tire_telemetry(state);
     test_setup_validation(state);
     if (state.failures != 0)

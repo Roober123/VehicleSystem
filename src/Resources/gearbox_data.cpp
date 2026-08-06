@@ -25,6 +25,15 @@ void GearboxData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_shift_time"), &GearboxData::get_shift_time);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shift_time", PROPERTY_HINT_RANGE, "0.05,2.0,0.01"), "set_shift_time", "get_shift_time");
 
+    // Clutch phase rates (engagement units per second)
+    ClassDB::bind_method(D_METHOD("set_clutch_engage_speed", "value"), &GearboxData::set_clutch_engage_speed);
+    ClassDB::bind_method(D_METHOD("get_clutch_engage_speed"), &GearboxData::get_clutch_engage_speed);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clutch_engage_speed", PROPERTY_HINT_RANGE, "0.01,100.0,0.01"), "set_clutch_engage_speed", "get_clutch_engage_speed");
+
+    ClassDB::bind_method(D_METHOD("set_clutch_disengage_speed", "value"), &GearboxData::set_clutch_disengage_speed);
+    ClassDB::bind_method(D_METHOD("get_clutch_disengage_speed"), &GearboxData::get_clutch_disengage_speed);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clutch_disengage_speed", PROPERTY_HINT_RANGE, "0.01,100.0,0.01"), "set_clutch_disengage_speed", "get_clutch_disengage_speed");
+
     // Upshift RPM ratio (normalized 0-1, fraction of RPM range)
     ClassDB::bind_method(D_METHOD("set_upshift_rpm", "value"), &GearboxData::set_upshift_rpm);
     ClassDB::bind_method(D_METHOD("get_upshift_rpm"), &GearboxData::get_upshift_rpm);
@@ -84,6 +93,22 @@ void GearboxData::set_shift_time(real_t p_value) {
 
 real_t GearboxData::get_shift_time() const {
     return shift_time;
+}
+
+void GearboxData::set_clutch_engage_speed(real_t p_value) {
+    clutch_engage_speed = p_value;
+}
+
+real_t GearboxData::get_clutch_engage_speed() const {
+    return clutch_engage_speed;
+}
+
+void GearboxData::set_clutch_disengage_speed(real_t p_value) {
+    clutch_disengage_speed = p_value;
+}
+
+real_t GearboxData::get_clutch_disengage_speed() const {
+    return clutch_disengage_speed;
 }
 
 void GearboxData::set_upshift_rpm(real_t p_value) {

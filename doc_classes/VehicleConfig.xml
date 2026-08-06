@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="VehicleConfig" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		One-shot aggregate of Vehicle setup resources.
+		Aggregate of Vehicle setup resources used during initialization and restart.
 	</brief_description>
 	<description>
-		VehicleConfig supplies the resources consumed during one-shot Vehicle initialization. Engine, gearbox, and suspension data are required. Aerodynamics and turbo data are optional. Direct drivetrain setup copies each driven axle's two wheel bodies, positive [member Axle.drive_share], and [member Axle.differential_data] into [code]DrivenAxle[/code] and [code]DifferentialSettings[/code] values. One through eight driven axles are supported; positive shares are normalized as flat weights with no inter-axle differential. The network receives direct solve arguments for timestep, signed ratio, engagement, and clutch capacity, and retains [code]ClutchTelemetry[/code] after successful atomic commit. VehicleSetupValidation reports missing major resources and invalid composition before runtime state is configured; changing this resource after initialization does not reconfigure the Vehicle.
+		VehicleConfig supplies resources copied during Vehicle initialization or [method Vehicle.restart]. Engine, gearbox, and suspension data are required. Aerodynamics and turbo data are optional. Direct drivetrain setup copies each driven axle's two wheel bodies, positive [member Axle.drive_share], and [member Axle.differential_data] into [code]DrivenAxle[/code] and [code]DifferentialSettings[/code] values. One through eight driven axles are supported; positive shares are normalized as flat weights with no inter-axle differential. The network receives direct solve arguments for timestep, signed ratio, engagement, and clutch capacity, and retains [code]ClutchTelemetry[/code] after successful atomic commit. VehicleSetupValidation reports missing major resources and invalid composition before runtime state is configured. Replacing this resource or editing referenced resources does not reconfigure active copied runtime state; those changes take effect after a successful [method Vehicle.restart].
 	</description>
 	<tutorials>
 	</tutorials>
