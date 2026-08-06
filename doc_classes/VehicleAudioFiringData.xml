@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleAudioFiringData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>Authored four-stroke crank phases and waveguide source routing.</brief_description>
+	<description>VehicleAudioFiringData stores parallel arrays of phases in degrees, source names, and gains plus a source pulse width. Phases are normalized modulo a 720-degree four-stroke cycle; up to 16 entries are accepted. Each firing event is compiled as a fixed normalized two-exponential pulse using a 15% attack width and the authored decay width. A new resource defaults to the conventional four-cylinder 1-3-4-2 order and a 1.5 ms pulse width.</description>
+	<tutorials></tutorials>
+	<methods>
+		<method name="set_phases_degrees"><return type="void" /><param index="0" name="value" type="PackedFloat32Array" /><description>Sets authored crank phases in degrees.</description></method>
+		<method name="get_phases_degrees" qualifiers="const"><return type="PackedFloat32Array" /><description>Returns authored crank phases in degrees.</description></method>
+		<method name="set_source_names"><return type="void" /><param index="0" name="value" type="PackedStringArray" /><description>Sets the waveguide source name routed by each phase.</description></method>
+		<method name="get_source_names" qualifiers="const"><return type="PackedStringArray" /><description>Returns phase source names.</description></method>
+		<method name="set_gains"><return type="void" /><param index="0" name="value" type="PackedFloat32Array" /><description>Sets the pulse gain for each phase.</description></method>
+		<method name="get_gains" qualifiers="const"><return type="PackedFloat32Array" /><description>Returns phase gains.</description></method>
+		<method name="set_pulse_width_ms"><return type="void" /><param index="0" name="value" type="float" /><description>Sets the positive source pulse decay width in milliseconds; setup compiles the normalized two-exponential pulse.</description></method>
+		<method name="get_pulse_width_ms" qualifiers="const"><return type="float" /><description>Returns the authored source pulse width in milliseconds.</description></method>
+		<method name="configure_default_four_stroke"><return type="void" /><description>Replaces the arrays with phases 0, 180, 360, and 540 degrees routed as cylinder 1, 3, 4, and 2 with gain 1.</description></method>
+	</methods>
+	<members>
+		<member name="phases_degrees" type="PackedFloat32Array" setter="set_phases_degrees" getter="get_phases_degrees">Finite crank phases; the arrays must have matching lengths and no more than 16 entries.</member>
+		<member name="source_names" type="PackedStringArray" setter="set_source_names" getter="get_source_names">Waveguide source name for each phase.</member>
+		<member name="gains" type="PackedFloat32Array" setter="set_gains" getter="get_gains">Pulse gain for each phase.</member>
+		<member name="pulse_width_ms" type="float" setter="set_pulse_width_ms" getter="get_pulse_width_ms" default="1.5">Positive source pulse decay width in milliseconds. The attack width is 15% of this value and the compiled two-exponential difference is peak-normalized.</member>
+	</members>
+</class>

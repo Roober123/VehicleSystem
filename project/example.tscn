@@ -8,6 +8,8 @@
 [ext_resource type="Script" uid="uid://c1ropaaauwyy1" path="res://wheel_visuals.gd" id="3_wheel_visuals"]
 [ext_resource type="Texture2D" uid="uid://ckr8y6al16fxl" path="res://addons/godot-prototype-texture/PNG/checker_512x512/checker_blue_512x512.png" id="4_ei00m"]
 [ext_resource type="Texture2D" uid="uid://bu5qgesppa7fo" path="res://addons/godot-prototype-texture/PNG/checker_512x512/checker_black_512x512.png" id="4_wcwec"]
+[ext_resource type="VehicleAudioTopologyData" uid="uid://b564narmqhwd3" path="res://Audio/four_cylinder_exhaust_topology.tres" id="9_hl4on"]
+[ext_resource type="VehicleAudioFiringData" uid="uid://jyabbl78ri63" path="res://Audio/four_cylinder_firing.tres" id="10_v40a1"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_2jas5"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -825,6 +827,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06605971, -0.0971117)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6853267, -1.5508447)
 script = ExtResource("3_wheel_visuals")
 vehicle = NodePath("..")
+
+[node name="VehicleAudio" type="VehicleAudio" parent="Vehicle1" unique_id=516985816 node_paths=PackedStringArray("target")]
+target = NodePath("..")
+topology = ExtResource("9_hl4on")
+firing = ExtResource("10_v40a1")
 
 [node name="VehicleController" type="Node" parent="." unique_id=2023098332 node_paths=PackedStringArray("vehicle")]
 script = ExtResource("3_controller")

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleAudioTopologyData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>Godot resource describing a bounded waveguide graph and output tap.</brief_description>
+	<description>VehicleAudioTopologyData is compiled by [VehicleAudio] into fixed native arrays. The graph supports up to 32 nodes, 48 guides, 16 source mappings, and one output tap selected by [member output_node]. The output tap can report post-scattering node pressure or boundary radiation from a single-guide reflection boundary.</description>
+	<tutorials></tutorials>
+	<methods>
+		<method name="set_nodes"><return type="void" /><param index="0" name="value" type="Array[VehicleAudioNodeData]" /><description>Sets the authored node resources.</description></method>
+		<method name="get_nodes" qualifiers="const"><return type="Array[VehicleAudioNodeData]" /><description>Returns the authored node resources.</description></method>
+		<method name="set_guides"><return type="void" /><param index="0" name="value" type="Array[VehicleAudioGuideData]" /><description>Sets the authored guide resources.</description></method>
+		<method name="get_guides" qualifiers="const"><return type="Array[VehicleAudioGuideData]" /><description>Returns the authored guide resources.</description></method>
+		<method name="set_source_names"><return type="void" /><param index="0" name="value" type="PackedStringArray" /><description>Sets unique pressure source names.</description></method>
+		<method name="get_source_names" qualifiers="const"><return type="PackedStringArray" /><description>Returns pressure source names.</description></method>
+		<method name="set_source_nodes"><return type="void" /><param index="0" name="value" type="PackedStringArray" /><description>Sets the node name for each source; when populated it parallels [member source_names].</description></method>
+		<method name="get_source_nodes" qualifiers="const"><return type="PackedStringArray" /><description>Returns source-to-node names.</description></method>
+		<method name="set_source_gains"><return type="void" /><param index="0" name="value" type="PackedFloat32Array" /><description>Sets optional per-source gains.</description></method>
+		<method name="get_source_gains" qualifiers="const"><return type="PackedFloat32Array" /><description>Returns source gains.</description></method>
+		<method name="set_output_node"><return type="void" /><param index="0" name="value" type="String" /><description>Sets the node sampled as the vehicle output.</description></method>
+		<method name="get_output_node" qualifiers="const"><return type="String" /><description>Returns the output node name.</description></method>
+		<method name="set_output_gain"><return type="void" /><param index="0" name="value" type="float" /><description>Sets gain applied to the output tap.</description></method>
+		<method name="get_output_gain" qualifiers="const"><return type="float" /><description>Returns output tap gain.</description></method>
+		<method name="set_output_tap_type"><return type="void" /><param index="0" name="value" type="int" /><description>Sets the output tap type: 0 for NodePressure or 1 for BoundaryRadiation.</description></method>
+		<method name="get_output_tap_type" qualifiers="const"><return type="int" /><description>Returns the output tap type enum value.</description></method>
+	</methods>
+	<members>
+		<member name="nodes" type="Array[VehicleAudioNodeData]" setter="set_nodes" getter="get_nodes">Authored graph nodes, at most 32.</member>
+		<member name="guides" type="Array[VehicleAudioGuideData]" setter="set_guides" getter="get_guides">Authored bidirectional guides, at most 48.</member>
+		<member name="source_names" type="PackedStringArray" setter="set_source_names" getter="get_source_names">Unique pressure source names, at most 16.</member>
+		<member name="source_nodes" type="PackedStringArray" setter="set_source_nodes" getter="get_source_nodes">Optional parallel node names for each source.</member>
+		<member name="source_gains" type="PackedFloat32Array" setter="set_source_gains" getter="get_source_gains">Optional parallel source gains; omitted entries default to 1.0.</member>
+		<member name="output_node" type="String" setter="set_output_node" getter="get_output_node">Required node name used for the output tap.</member>
+		<member name="output_gain" type="float" setter="set_output_gain" getter="get_output_gain" default="1.0">Gain applied to the output tap.</member>
+		<member name="output_tap_type" type="int" setter="set_output_tap_type" getter="get_output_tap_type" default="0">Output tap mode: 0 (NodePressure) samples post-scattering node pressure; 1 (BoundaryRadiation) samples `(1 - reflection) * incident` at a reflection boundary.</member>
+	</members>
+</class>

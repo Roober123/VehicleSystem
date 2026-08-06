@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleAudio" inherits="AudioStreamPlayer3D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Bounded procedural waveguide audio player driven by a Vehicle telemetry stream.
+	</brief_description>
+	<description>
+		VehicleAudio compiles [VehicleAudioTopologyData] and [VehicleAudioFiringData] once during [method Node._ready] into a fixed-memory waveguide network and four-stroke scheduler. Source events retain the authored pulse width as their baseline while event-time RPM/throttle shaping derives bounded width and attack changes; the Vehicle adapter scales pressure by [code]0.1 + 0.9 * throttle[/code] and uses a resettable four-value deterministic gain cycle without RNG or cadence changes. Guides compile broadband and per-direction high-frequency loss; the output tap selects post-scattering node pressure or boundary radiation. It renders a 48 kHz [AudioStreamGenerator] in bounded staging blocks and applies a fixed 20 Hz DC blocker, 6.5 kHz low-pass, and [code]tanh[/code] conditioner. Invalid or missing resources disable audio; topology validation and coefficient derivation are setup-only, and resource edits take effect after node re-entry or a new setup.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_target">
+			<return type="void" />
+			<param index="0" name="vehicle" type="Vehicle" />
+			<description>Sets the Vehicle whose engine RPM and throttle drive firing and pulse amplitude.</description>
+		</method>
+		<method name="get_target" qualifiers="const">
+			<return type="Vehicle" />
+			<description>Returns the assigned or automatically discovered target Vehicle.</description>
+		</method>
+		<method name="set_topology">
+			<return type="void" />
+			<param index="0" name="topology" type="VehicleAudioTopologyData" />
+			<description>Sets the topology resource compiled during setup.</description>
+		</method>
+		<method name="get_topology" qualifiers="const">
+			<return type="VehicleAudioTopologyData" />
+			<description>Returns the authored topology resource.</description>
+		</method>
+		<method name="set_firing">
+			<return type="void" />
+			<param index="0" name="firing" type="VehicleAudioFiringData" />
+			<description>Sets the four-stroke phase and source-routing resource compiled during setup.</description>
+		</method>
+		<method name="get_firing" qualifiers="const">
+			<return type="VehicleAudioFiringData" />
+			<description>Returns the authored firing resource.</description>
+		</method>
+		<method name="is_audio_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>Returns true after topology, firing, generator, and playback setup succeeds.</description>
+		</method>
+	</methods>
+	<members>
+		<member name="target" type="Vehicle" setter="set_target" getter="get_target">
+			Vehicle providing engine RPM and throttle telemetry. If unset, the parent and then sibling nodes are searched during setup.
+		</member>
+		<member name="topology" type="VehicleAudioTopologyData" setter="set_topology" getter="get_topology">
+			Waveguide nodes, guides, source mappings, output tap node, and NodePressure/BoundaryRadiation output mode to compile.
+		</member>
+		<member name="firing" type="VehicleAudioFiringData" setter="set_firing" getter="get_firing">
+			720-degree firing phases, source names, pulse gains, and source pulse width to compile.
+		</member>
+	</members>
+</class>

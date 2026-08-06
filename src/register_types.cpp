@@ -20,9 +20,12 @@
 #include "TireSkid.h"
 #include "Resources/turbo_data.h"
 #include "Resources/vehicle_config.h"
+#include "Resources/vehicle_audio_data.h"
+#include "VehicleAudio.h"
 
 #ifdef VEHICLE_SYSTEM_REGRESSION_TESTS
 #include "../Test/drivetrain_regression.h"
+#include "../Test/audio_regression.h"
 #endif
 
 
@@ -47,8 +50,14 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(Vehicle);
 	GDREGISTER_CLASS(VehicleTelemetry);
 	GDREGISTER_CLASS(TireSkid);
+	GDREGISTER_CLASS(VehicleAudioNodeData);
+	GDREGISTER_CLASS(VehicleAudioGuideData);
+	GDREGISTER_CLASS(VehicleAudioTopologyData);
+	GDREGISTER_CLASS(VehicleAudioFiringData);
+	GDREGISTER_CLASS(VehicleAudio);
 	#ifdef VEHICLE_SYSTEM_REGRESSION_TESTS
 	GDREGISTER_CLASS(DrivetrainRegression);
+	GDREGISTER_CLASS(AudioRegression);
 	#endif
 	
 	

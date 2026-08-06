@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleAudioGuideData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>Physical authoring data for one bidirectional waveguide.</brief_description>
+	<description>VehicleAudioGuideData connects two named nodes. During setup, length in metres becomes an integer delay at the configured sample rate, loss per metre becomes exponential traversal attenuation, and high-frequency loss per metre becomes a compiled one-pole coefficient applied independently to both travelling directions.</description>
+	<tutorials></tutorials>
+	<methods>
+		<method name="set_name"><return type="void" /><param index="0" name="value" type="String" /><description>Sets the unique guide name.</description></method>
+		<method name="get_name" qualifiers="const"><return type="String" /><description>Returns the guide name.</description></method>
+		<method name="set_from"><return type="void" /><param index="0" name="value" type="String" /><description>Sets the source endpoint node name.</description></method>
+		<method name="get_from" qualifiers="const"><return type="String" /><description>Returns the source endpoint node name.</description></method>
+		<method name="set_to"><return type="void" /><param index="0" name="value" type="String" /><description>Sets the destination endpoint node name.</description></method>
+		<method name="get_to" qualifiers="const"><return type="String" /><description>Returns the destination endpoint node name.</description></method>
+		<method name="set_length_meters"><return type="void" /><param index="0" name="value" type="float" /><description>Sets the positive physical guide length in metres.</description></method>
+		<method name="get_length_meters" qualifiers="const"><return type="float" /><description>Returns the authored guide length in metres.</description></method>
+		<method name="set_area"><return type="void" /><param index="0" name="value" type="float" /><description>Sets the positive cross-sectional area used for junction weighting.</description></method>
+		<method name="get_area" qualifiers="const"><return type="float" /><description>Returns the authored cross-sectional area.</description></method>
+		<method name="set_loss_per_meter"><return type="void" /><param index="0" name="value" type="float" /><description>Sets non-negative traversal loss per metre.</description></method>
+		<method name="get_loss_per_meter" qualifiers="const"><return type="float" /><description>Returns the authored traversal loss per metre.</description></method>
+		<method name="set_high_frequency_loss_per_meter"><return type="void" /><param index="0" name="value" type="float" /><description>Sets non-negative high-frequency loss per metre compiled for each guide direction.</description></method>
+		<method name="get_high_frequency_loss_per_meter" qualifiers="const"><return type="float" /><description>Returns the authored high-frequency loss per metre.</description></method>
+	</methods>
+	<members>
+		<member name="name" type="String" setter="set_name" getter="get_name">Unique non-empty guide name.</member>
+		<member name="from" type="String" setter="set_from" getter="get_from">Named node at one guide endpoint.</member>
+		<member name="to" type="String" setter="set_to" getter="get_to">Named node at the other guide endpoint.</member>
+		<member name="length_meters" type="float" setter="set_length_meters" getter="get_length_meters" default="1.0">Positive physical length; converted to an integer delay during setup.</member>
+		<member name="area" type="float" setter="set_area" getter="get_area" default="1.0">Positive cross-sectional area used in node scattering.</member>
+		<member name="loss_per_meter" type="float" setter="set_loss_per_meter" getter="get_loss_per_meter" default="0.0">Non-negative loss coefficient; traversal attenuation is exp(-loss_per_meter * length_meters).</member>
+		<member name="high_frequency_loss_per_meter" type="float" setter="set_high_frequency_loss_per_meter" getter="get_high_frequency_loss_per_meter" default="0.0">Non-negative HF loss coefficient; setup compiles exp(-high_frequency_loss_per_meter * length_meters) into independent per-direction one-pole filtering.</member>
+	</members>
+</class>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VehicleAudioNodeData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>Authoring data for one waveguide graph node.</brief_description>
+	<description>VehicleAudioNodeData names either a junction or a single-guide reflection boundary. A junction with zero [member nonlinearity] is linear; positive values compress outgoing pressure as [code]linear / (1 + nonlinearity * abs(linear))[/code]. Boundary reflection is constrained to -1..1 during topology compilation; BoundaryRadiation output taps may select only this single-guide boundary type.</description>
+	<tutorials></tutorials>
+	<methods>
+		<method name="set_name"><return type="void" /><param index="0" name="value" type="String" /><description>Sets the unique graph node name.</description></method>
+		<method name="get_name" qualifiers="const"><return type="String" /><description>Returns the graph node name.</description></method>
+		<method name="set_node_type"><return type="void" /><param index="0" name="value" type="int" /><description>Sets the node type: [constant JUNCTION] or [constant REFLECTION_BOUNDARY].</description></method>
+		<method name="get_node_type" qualifiers="const"><return type="int" /><description>Returns the node type enum value.</description></method>
+		<method name="set_reflection"><return type="void" /><param index="0" name="value" type="float" /><description>Sets the boundary reflection coefficient.</description></method>
+		<method name="get_reflection" qualifiers="const"><return type="float" /><description>Returns the authored reflection coefficient.</description></method>
+		<method name="set_nonlinearity"><return type="void" /><param index="0" name="value" type="float" /><description>Sets the non-negative junction pressure-compression coefficient; zero preserves the linear response.</description></method>
+		<method name="get_nonlinearity" qualifiers="const"><return type="float" /><description>Returns the authored junction pressure-compression coefficient.</description></method>
+	</methods>
+	<constants>
+		<constant name="JUNCTION" value="0"><description>Area-weighted scattering junction.</description></constant>
+		<constant name="REFLECTION_BOUNDARY" value="1"><description>Single-guide boundary with an authored reflection coefficient.</description></constant>
+	</constants>
+	<members>
+		<member name="name" type="String" setter="set_name" getter="get_name">Unique non-empty graph name used by guides, sources, and taps.</member>
+		<member name="node_type" type="int" setter="set_node_type" getter="get_node_type" default="0">Node kind: [constant JUNCTION] or [constant REFLECTION_BOUNDARY].</member>
+		<member name="reflection" type="float" setter="set_reflection" getter="get_reflection" default="0.0">Reflection coefficient for a boundary, in the inclusive range -1..1.</member>
+		<member name="nonlinearity" type="float" setter="set_nonlinearity" getter="get_nonlinearity" default="0.0">Non-negative junction pressure-compression coefficient. Zero is identity; positive values use [code]linear / (1 + nonlinearity * abs(linear))[/code]. Boundary nodes ignore this field.</member>
+	</members>
+</class>

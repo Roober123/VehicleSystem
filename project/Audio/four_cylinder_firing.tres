@@ -1,0 +1,4 @@
+[gd_resource type="VehicleAudioFiringData" format=3 uid="uid://jyabbl78ri63"]
+
+[resource]
+pulse_width_ms = 3.0
