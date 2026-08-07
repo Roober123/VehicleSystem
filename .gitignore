@@ -103,6 +103,6 @@ auth.json
 *.kdbx
 *.ovpn
 
-# Keep the complete web export available for GitHub Pages.
-!/project/Exported/
-!/project/Exported/**
+# Keep documentation and the complete web export available for GitHub Pages.
+!/docs/
+!/docs/**

@@ -55,7 +55,7 @@ wheels with tire data per axle, steering data for steerable axles, and at least
 one driven axle with `DifferentialData`. Aerodynamics and turbo resources are
 optional. Invalid compositions are reported during setup and remain inert.
 
-See [Project architecture](docs/ARCHITECTURE.md) for component ownership,
+See [Project architecture](ARCHITECTURE.md) for component ownership,
 configuration rules, runtime ordering, limits, and notable simulation behavior.
 See [Rotational drivetrain flow](src/Drivetrain/README.md) for the constraint
 model, Schur-complement clutch solve, differential policies, transaction
