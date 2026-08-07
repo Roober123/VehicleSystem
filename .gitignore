@@ -15,6 +15,7 @@ mono_crash.*.json
 # SCons and compiler intermediates
 .sconsign*.dblite
 .sconf_temp/
+.scons-cache/
 
 # Ignore custom.py
 custom.py
@@ -81,3 +82,23 @@ htmlcov/
 # Cmake
 cmake-build*
 CMakeUserPresets.json
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+!.env.*.example
+credentials.*
+secrets.*
+service-account*.json
+auth.json
+.npmrc
+.pypirc
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+*.ovpn

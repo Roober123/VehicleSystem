@@ -12,6 +12,20 @@ projectdir = "project"
 
 localEnv = Environment(tools=["default"], PLATFORM="")
 
+# Keep a content-addressed cache across platform switches. Object names and
+# construction signatures already include platform, target, precision,
+# architecture, threading, and relevant toolchain flags, so incompatible
+# Windows/Web (or debug/release) objects cannot collide.
+scons_cache_dir = os.environ.get("SCONS_CACHE")
+if scons_cache_dir is None:
+    scons_cache_dir = os.path.abspath(".scons-cache")
+if scons_cache_dir:
+    # Create the directory explicitly so cache initialization does not depend
+    # on a temporary-directory rename succeeding on restricted filesystems.
+    os.makedirs(scons_cache_dir, exist_ok=True)
+    CacheDir(scons_cache_dir)
+    Decider("MD5")
+
 # Build profiles can be used to decrease compile times.
 # You can either specify "disabled_classes", OR
 # explicitly specify "enabled_classes" which disables all other classes.
@@ -59,6 +73,12 @@ finally:
 # defines must never leak back into that construction graph.
 production_env = godot_cpp_env.Clone()
 production_env.Append(CPPPATH=["src/"])
+# godot-cpp already gives its static objects a full configuration suffix.
+# SharedObject uses SHOBJSUFFIX instead, so key extension objects the same way
+# to let Windows/Web and debug/release variants coexist in the working tree.
+production_env["SHOBJSUFFIX"] = (
+    production_env["suffix"] + production_env.subst("$SHOBJSUFFIX")
+)
 
 all_sources = Glob("src/*.cpp") + Glob("src/**/*.cpp")
 
@@ -107,8 +127,7 @@ else:
     test_env = production_env.Clone()
     if run_regression_tests:
         test_env.Append(CPPDEFINES=["VEHICLE_SYSTEM_REGRESSION_TESTS"])
-    # Keep test-only objects separate even on toolchains whose default
-    # shared-object suffix is just `.os`.
+    # Keep test-only objects separate from the normal configuration objects.
     test_env["SHOBJSUFFIX"] = ".tests" + test_env.subst("$SHOBJSUFFIX")
     test_objects = test_env.SharedObject(
         source=[register_source] + Glob("Test/*.cpp")
