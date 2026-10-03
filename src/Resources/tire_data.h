@@ -16,6 +16,8 @@ public:
     real_t get_friction_forward() const { return friction_forward; }
     void set_friction_lateral(real_t value);
     real_t get_friction_lateral() const { return friction_lateral; }
+    void set_peak_slip_ratio(real_t value);
+    real_t get_peak_slip_ratio() const { return peak_slip_ratio; }
     void set_lateral_response_angle(real_t value);
     real_t get_lateral_response_angle() const { return lateral_response_angle; }
     void set_load_grip_loss_percent(real_t value);
@@ -54,6 +56,7 @@ public:
 private:
     real_t friction_forward = 1.0;
     real_t friction_lateral = 1.0;
+    real_t peak_slip_ratio = 0.15;
     real_t lateral_response_angle = 10.0;
     real_t load_grip_loss_percent = 6.696700846;
     real_t radius = 0.3;

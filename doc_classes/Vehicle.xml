@@ -47,7 +47,7 @@
 		</method>
 		<method name="restart" qualifiers="">
 			<return type="bool" />
-			<description>Revalidates and rebuilds copied runtime state from the current [VehicleConfig], referenced resources, and direct [Axle] children. Reapplies tire, steering, suspension, aerodynamics, and drivetrain resources without changing child-wheel topology. Existing body transform and linear/angular velocities are preserved. Returns [code]true[/code] and emits [signal vehicle_ready] on success; returns [code]false[/code] and leaves the Vehicle inert on failure.</description>
+			<description>Revalidates and rebuilds copied runtime state from the current [VehicleConfig], referenced resources, and direct [Axle] children. Reapplies tire, steering, suspension, aerodynamics, ESC, and drivetrain resources without changing child-wheel topology. Existing body transform and linear/angular velocities are preserved. Returns [code]true[/code] and emits [signal vehicle_ready] on success; returns [code]false[/code] and leaves the Vehicle inert on failure.</description>
 		</method>
 		<method name="set_throttle_input" qualifiers="">
 			<return type="void" />
@@ -125,11 +125,14 @@
 		</method>
 	</methods>
 	<members>
+        <member name="engine_axis" type="Vector3" setter="set_engine_axis" getter="get_engine_axis" default="Vector3(0, 0, 1)">
+            Crankshaft spin axis in chassis-local coordinates, normalized on assignment. Use Z for a longitudinal engine or X for a transverse engine. Reverse the vector to reverse spin direction. Its magnitude does not scale strength. Zero disables engine reaction/vibration; nonfinite values are ignored. Requires [member VehicleConfig.engine_reaction_data]. May be changed at runtime without restart.
+        </member>
 		<member name="center_of_mass_marker" type="Marker3D" setter="set_center_of_mass_marker" getter="get_center_of_mass_marker">
 			Optional Inspector [Marker3D]. On each successful setup or restart, its global position is converted to Vehicle-local coordinates and applied as the custom center of mass before running-gear setup. [code]null[/code] leaves the [RigidBody3D] center-of-mass mode and value unchanged.
 		</member>
 		<member name="config" type="VehicleConfig" setter="set_config" getter="get_config">
-			Setup resource containing required engine, gearbox, suspension, and optional aerodynamics/turbo data. Its values are copied during setup or [method restart]; later edits take effect on the next successful restart.
+			Setup resource containing required engine, gearbox, suspension, and optional aerodynamics/ESC/turbo data. Its values are copied during setup or [method restart]; later edits take effect on the next successful restart.
 		</member>
 		<member name="abs_enabled" type="bool" setter="set_abs_enabled" getter="get_abs_enabled" default="true">
 			Whether anti-lock brake modulation is enabled.

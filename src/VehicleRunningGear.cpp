@@ -55,19 +55,12 @@ void VehicleRunningGear::update_suspension(RigidBody3D *vehicle,
 }
 
 void VehicleRunningGear::apply_aerodynamics(RigidBody3D *vehicle,
-                                            const Basis &body_basis,
                                             const Vector3 &linear_velocity,
-                                            const Vector3 &angular_velocity,
-                                            real_t vehicle_mass,
                                             const Vector3 &body_origin) {
-    const AerodynamicsState state = aerodynamics.get_state(
-        body_basis, linear_velocity, angular_velocity, vehicle_mass, axles);
-    const AerodynamicForces forces = aerodynamics.compute(state);
+    const AerodynamicForces forces = aerodynamics.compute(linear_velocity);
 
     if (forces.drag.length_squared() > real_t{1e-8})
         vehicle->apply_central_force(forces.drag);
-    if (forces.yaw_control_torque.length_squared() > real_t{1e-8})
-        vehicle->apply_torque(forces.yaw_control_torque);
     apply_downforce(vehicle, forces.downforce, body_origin);
 }
 
@@ -111,6 +104,8 @@ void VehicleRunningGear::solve_steering_and_tires(const Vector3 &com_global,
                                                   bool abs_enabled) {
     for (Axle *axle : axles) {
         if (axle->get_steerable()) {
+            // SAT is from the previous completed tire solve. Chassis velocity
+            // and contact observations stay fixed throughout these substeps.
             axle->solve_steering(steer_input, dt, speed_kph);
             axle->set_wheels_rotation();
         }

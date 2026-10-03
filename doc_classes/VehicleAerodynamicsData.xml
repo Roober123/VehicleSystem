@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="VehicleAerodynamicsData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A resource that defines aerodynamic properties: drag, downforce, and yaw damping.
+		A resource that defines aerodynamic properties: drag and downforce.
 	</brief_description>
 	<description>
-		VehicleAerodynamicsData is a [Resource] that configures the vehicle's aerodynamic forces. Drag opposes forward motion, downforce increases tire grip at speed, and yaw damping provides high-speed rotational stability without fighting low-speed maneuverability.
+		VehicleAerodynamicsData configures aerodynamic drag and downforce. Drag opposes vehicle velocity; downforce grows with squared speed. Optional yaw stabilization is configured separately through [ESCData].
 	</description>
 	<tutorials>
 	</tutorials>
@@ -13,10 +13,7 @@
 			Aerodynamic drag coefficient (Cd). Higher values increase air resistance at speed.
 		</member>
 		<member name="downforce_coefficient" type="float" setter="set_downforce_coefficient" getter="get_downforce_coefficient" default="0.15">
-			Downforce coefficient. Combined with drag coefficient to produce aerodynamic downforce that pushes the tires into the ground at speed.
-		</member>
-		<member name="yaw_damping_coefficient" type="float" setter="set_yaw_damping_coefficient" getter="get_yaw_damping_coefficient" default="2.0">
-			Yaw damping coefficient. Applies a torque opposing yaw rotation proportional to [code]mass × angular_velocity × |angular_velocity|[/code]. Higher values stabilize the car at speed without affecting low-speed turning.
+			Downforce coefficient. Multiplied by dynamic pressure and frontal area to produce aerodynamic downforce at speed.
 		</member>
 	</members>
 </class>

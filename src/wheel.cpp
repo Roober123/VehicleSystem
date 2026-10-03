@@ -4,6 +4,12 @@
 #include <cmath>
 
 namespace godot {
+namespace {
+real_t longitudinal_reference_speed(real_t forward_speed) {
+    // Smoothly regularize slip near rest without a division-by-zero or launch jump.
+    return std::hypot(forward_speed, real_t{3.0});
+}
+} // namespace
 
 void Wheel::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_angular_velocity"), &Wheel::get_angular_velocity);
@@ -45,6 +51,7 @@ void Wheel::set_tire(const Ref<TireData>& t) {
         return;
     this->friction_forward = t->get_friction_forward();
     this->friction_lateral = t->get_friction_lateral();
+    this->peak_slip_ratio = t->get_peak_slip_ratio();
     this->forward_friction_curve = t->get_forward_friction_curve();
     this->lateral_friction_curve = t->get_lateral_friction_curve();
     this->radius = t->get_radius();
@@ -101,6 +108,8 @@ void Wheel::update_suspension(const Vector3 &com_global,
         abs_active = false;
         prev_longitudinal_force = 0.0;
         prev_lateral_force = 0.0;
+        relaxed_slip_velocity = 0.0;
+        relaxed_slip_angle = 0.0;
         if (skid != nullptr)
             skid->stop_skid();
         return;
@@ -135,11 +144,23 @@ void Wheel::solve_tire(const Vector3 &com_global, const Vector3 &linear_velocity
     is_sliding = false;
     reaction_torque = 0.0f;
     self_aligning_torque = 0.0;
-    if (!on_ground)
+    if (!on_ground) {
+        relaxed_slip_velocity = 0.0;
+        relaxed_slip_angle = 0.0;
         return;
+    }
 
+    // Steering has changed since the suspension snapshot. Refresh only axes,
+    // keeping the same raycast/contact observations for all tire substeps.
+    const Basis wheel_basis = is_inside_tree() ? get_global_transform().basis : get_transform().basis;
+    forward_vector = wheel_basis.get_column(2);
+    right_vector = wheel_basis.get_column(0);
     Vector3 fwd_tangent, right_tangent;
-    _compute_tangents(fwd_tangent, right_tangent);
+    if (!_compute_tangents(fwd_tangent, right_tangent)) {
+        relaxed_slip_velocity = 0.0;
+        relaxed_slip_angle = 0.0;
+        return;
+    }
 
     Vector3 vel_point = linear_velocity + angular_velocity.cross(collision_point - com_global);
     real_t fwd_speed = vel_point.dot(fwd_tangent);
@@ -152,33 +173,41 @@ void Wheel::solve_tire(const Vector3 &com_global, const Vector3 &linear_velocity
     if (normal <= real_t{1e-6}) {
         prev_longitudinal_force = 0.0;
         prev_lateral_force = 0.0;
+        relaxed_slip_velocity = 0.0;
+        relaxed_slip_angle = 0.0;
         _update_skidmarks(vel_point, fwd_tangent, slip_vel, lat_speed,
                           real_t{0.0}, real_t{0.0}, normal, dt);
-        _apply_brakes(brake_input, abs_enabled, fwd_speed, dt, normal, fwd_tangent);
+        _apply_brakes(brake_input, abs_enabled, fwd_speed, dt, normal);
         return;
     }
 
     real_t raw_fwd_force, raw_lat_force, fwd_mu, lat_mu;
-    _compute_raw_forces(normal, slip_vel, slip_angle_rad, fwd_speed, lat_speed,
+    _update_relaxed_slip(slip_vel, slip_angle_rad, fwd_speed, dt);
+    _compute_raw_forces(normal, relaxed_slip_velocity, relaxed_slip_angle, fwd_speed,
                         raw_fwd_force, raw_lat_force, fwd_mu, lat_mu);
-
     real_t longitudinal_force, lateral_force;
     _combine_forces(raw_fwd_force, raw_lat_force, normal, fwd_mu, lat_mu,
                     longitudinal_force, lateral_force);
 
-    _apply_relaxation(longitudinal_force, lateral_force, dt, linear_velocity);
+    // Brakes act after tire reaction torque, so a locked wheel stays locked.
+    reaction_torque = -longitudinal_force * radius;
+    body.add_torque(reaction_torque);
+    const real_t hold_force = _apply_brakes(brake_input, abs_enabled, fwd_speed, dt, normal);
+    if (hold_force != real_t{0.0}) {
+        // Brake hold shares the current contact's grip budget with tire forces.
+        _combine_forces(longitudinal_force + hold_force, lateral_force, normal, fwd_mu, lat_mu,
+                        longitudinal_force, lateral_force);
+    }
 
     _apply_tire_forces(fwd_tangent, right_tangent, longitudinal_force, lateral_force);
 
     _compute_sat(lateral_force);
-    body.add_torque(reaction_torque);
 
     _detect_tire_instability(lateral_force, dt);
+    prev_longitudinal_force = longitudinal_force;
 
     _update_skidmarks(vel_point, fwd_tangent, slip_vel, lat_speed,
                       longitudinal_force, lateral_force, normal, dt);
-
-    _apply_brakes(brake_input, abs_enabled, fwd_speed, dt, normal, fwd_tangent);
 }
 
 void Wheel::_detect_tire_instability(real_t total_lateral_force, real_t dt) {
@@ -215,11 +244,10 @@ real_t Wheel::_apply_abs(real_t brake_input, real_t fwd_speed, real_t dt) {
         return brake_input;
     }
 
-    constexpr real_t abs_target_slip = real_t{0.15};
     constexpr real_t abs_release_fraction = real_t{0.25};
     constexpr real_t abs_cycle_rate = real_t{8.0}; // Hz, pressure rebuild rate
 
-    real_t slip_error = std::abs(slip_ratio) - abs_target_slip;
+    real_t slip_error = std::abs(slip_ratio) - peak_slip_ratio;
 
     if (slip_error > 0.0f) {
         // Wheel is locking — release pressure proportionally
@@ -246,9 +274,27 @@ void Wheel::_compute_sat(real_t lateral_force) {
     self_aligning_torque = lateral_force * trail;
 }
 
-void Wheel::_compute_tangents(Vector3& fwd_tangent, Vector3& right_tangent) const {
-    fwd_tangent = (forward_vector - collision_normal * forward_vector.dot(collision_normal)).normalized();
-    right_tangent = (right_vector - collision_normal * right_vector.dot(collision_normal)).normalized();
+bool Wheel::_compute_tangents(Vector3& fwd_tangent, Vector3& right_tangent) const {
+    constexpr real_t min_length_squared = real_t{1e-10};
+    if (!collision_normal.is_finite() || !forward_vector.is_finite() ||
+        !right_vector.is_finite() || collision_normal.length_squared() < min_length_squared)
+        return false;
+
+    const Vector3 normal = collision_normal.normalized();
+    fwd_tangent = forward_vector - normal * forward_vector.dot(normal);
+    if (fwd_tangent.length_squared() < min_length_squared) {
+        right_tangent = right_vector - normal * right_vector.dot(normal);
+        if (right_tangent.length_squared() < min_length_squared)
+            return false;
+        right_tangent.normalize();
+    } else {
+        fwd_tangent.normalize();
+        right_tangent = normal.cross(fwd_tangent).normalized();
+        if (right_tangent.dot(right_vector) < real_t{0.0})
+            right_tangent = -right_tangent;
+    }
+    fwd_tangent = right_tangent.cross(normal).normalized();
+    return true;
 }
 
 void Wheel::_compute_slip(real_t fwd_speed, real_t lat_speed, real_t& slip_vel, real_t& slip_angle_rad) {
@@ -257,7 +303,7 @@ void Wheel::_compute_slip(real_t fwd_speed, real_t lat_speed, real_t& slip_vel, 
 
     slip_angle_rad = atan2(lat_speed, std::abs(fwd_speed) + real_t{2.5});
 
-    slip_ratio = slip_vel / std::max(std::abs(fwd_speed), real_t{1.0});
+    slip_ratio = slip_vel / longitudinal_reference_speed(fwd_speed);
     slip_angle = slip_angle_rad * real_t{180.0} / Math_PI;
 
     constexpr real_t sliding_slip_ratio = real_t{0.2};
@@ -270,11 +316,10 @@ real_t Wheel::_compute_normal_force() const {
     return suspension_rebound_force;
 }
 
-void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angle_rad,
-                                 real_t fwd_speed, real_t lat_speed,
+void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angle_rad, real_t forward_speed,
                                  real_t& raw_fwd_force, real_t& raw_lat_force,
                                  real_t& fwd_mu, real_t& lat_mu) const {
-    constexpr real_t peak_slip_vel = real_t{3.0};
+    const real_t normalized_forward_slip = slip_vel / longitudinal_reference_speed(forward_speed) / peak_slip_ratio;
     real_t peak_slip_rad = peak_slip_angle * Math_PI / real_t{180.0};
 
     fwd_mu = friction_forward * grip_multiplier;
@@ -284,18 +329,12 @@ void Wheel::_compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angl
     fwd_mu *= load_scale;
     lat_mu *= load_scale;
 
-    if (std::abs(fwd_speed) + std::abs(lat_speed) < real_t{1.0}) {
-        fwd_mu *= real_t{1.3};
-        lat_mu *= real_t{1.3};
-    }
-
-
     if (forward_friction_curve.is_valid()) {
-        real_t t = std::clamp(std::abs(slip_vel) / peak_slip_vel, real_t{0.0}, real_t{2.0});
+        real_t t = std::clamp(std::abs(normalized_forward_slip), real_t{0.0}, real_t{2.0});
         real_t mult = forward_friction_curve->sample(t);
         raw_fwd_force = normal * fwd_mu * mult * (slip_vel >= real_t{0.0} ? real_t{1.0} : real_t{-1.0});
     } else {
-        raw_fwd_force = normal * fwd_mu * tanh(slip_vel / peak_slip_vel);
+        raw_fwd_force = normal * fwd_mu * tanh(normalized_forward_slip);
     }
 
     if (lateral_friction_curve.is_valid()) {
@@ -324,8 +363,8 @@ real_t Wheel::_combine_forces(real_t raw_fwd, real_t raw_lat, real_t normal,
         sum = std::pow(lateral_pow + longitudinal_pow, real_t{1.0} / combined_grip_exponent);
     }
 
-    out_fwd = raw_fwd;
-    out_lat = raw_lat;
+    out_fwd = fwd_mu > real_t{0.0} ? raw_fwd : real_t{0.0};
+    out_lat = lat_mu > real_t{0.0} ? raw_lat : real_t{0.0};
 
     if (sum > real_t{1.0}) {
         real_t r = real_t{1.0} / sum;
@@ -341,25 +380,21 @@ real_t Wheel::_get_load_sensitivity_scale(real_t normal_load) const {
     return std::clamp(scale, real_t{0.75}, real_t{1.25});
 }
 
-void Wheel::_apply_relaxation(real_t& longitudinal_force, real_t& lateral_force,
-                               real_t dt, const Vector3& linear_velocity) {
-    real_t clamped_speed = std::clamp(std::abs(linear_velocity.length()), real_t{0.0}, real_t{30.0});
+void Wheel::_update_relaxed_slip(real_t target_slip_velocity, real_t target_slip_angle,
+                                real_t forward_speed, real_t dt) {
+    real_t clamped_speed = std::clamp(std::abs(forward_speed), real_t{0.0}, real_t{30.0});
     real_t relaxation_time = relaxation_low + (relaxation_high - relaxation_low) * clamped_speed / real_t{30.0};
     const real_t alpha = relaxation_time > real_t{0.0}
         ? -std::expm1(-dt / relaxation_time) : real_t{1.0};
 
-    longitudinal_force = prev_longitudinal_force + (longitudinal_force - prev_longitudinal_force) * alpha;
-    lateral_force = prev_lateral_force + (lateral_force - prev_lateral_force) * alpha;
-
-    prev_longitudinal_force = longitudinal_force;
-    prev_lateral_force = lateral_force;
+    relaxed_slip_velocity += (target_slip_velocity - relaxed_slip_velocity) * alpha;
+    relaxed_slip_angle += (target_slip_angle - relaxed_slip_angle) * alpha;
 }
 
 void Wheel::_apply_tire_forces(const Vector3& fwd_tangent, const Vector3& right_tangent,
                                 real_t longitudinal_force, real_t lateral_force) {
     Vector3 point_force = fwd_tangent * longitudinal_force - right_tangent * lateral_force;
     tire_force += point_force;
-    reaction_torque -= longitudinal_force * radius;
 }
 
 void Wheel::_update_skidmarks(const Vector3& vel_point,
@@ -388,8 +423,8 @@ void Wheel::_update_skidmarks(const Vector3& vel_point,
     skid->submit_sample(sample, dt);
 }
 
-void Wheel::_apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed,
-                           real_t dt, real_t normal, const Vector3& fwd_tangent) {
+real_t Wheel::_apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed,
+                            real_t dt, real_t normal) {
     real_t effective_brake = brake_input;
     if (abs_enabled) effective_brake = _apply_abs(brake_input, fwd_speed, dt);
 
@@ -405,12 +440,13 @@ void Wheel::_apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed
             if (std::abs(fwd_speed) > real_t{0.005}) {
                 real_t max_hold = normal * friction_forward * effective_brake;
                 real_t hold_force = -tanh(fwd_speed * real_t{20.0}) * max_hold;
-                tire_force += fwd_tangent * hold_force;
+                return hold_force;
             }
         } else {
             body.add_torque((omega > 0.0f) ? -brake_torque : brake_torque);
         }
     }
+    return real_t{0.0};
 }
 
 }

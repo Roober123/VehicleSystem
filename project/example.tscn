@@ -24,8 +24,6 @@ glow_enabled = true
 [sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_6yyhk"]
 drag_coefficient = 1.0
 downforce_coefficient = 0.2
-yaw_damping_coefficient = 1.0
-yaw_control_max_torque = 3000.0
 
 [sub_resource type="Curve" id="Curve_3dlnp"]
 _data = [Vector2(0, 0.801105), 0.0, 0.0, 0, 0, Vector2(0.29945058, 1), 0.0, 0.0, 0, 0, Vector2(0.93681324, 0.9005525), -0.25138134, -0.25138134, 0, 0, Vector2(1, 0.54696137), 0.0, 0.0, 0, 0]
@@ -37,6 +35,16 @@ idle_rpm = 700.0
 redline_rpm = 4000.0
 max_torque = 450.0
 engine_drag = 0.1
+
+[sub_resource type="EngineReactionData" id="EngineReactionData_kkclv"]
+reaction_strength = 2.0
+maximum_torque = 8000.0
+vibration_strength = 3.3
+speed_fade_end_kph = 55.0
+
+[sub_resource type="ESCData" id="ESCData_6yyhk"]
+yaw_damping = 1.0
+maximum_corrective_torque = 3000.0
 
 [sub_resource type="GearboxData" id="GearboxData_p21br"]
 gear_ratios = PackedFloat64Array(9, 6, 4, 3, 2.5, 2.1, 1.8, 1.5)
@@ -55,26 +63,28 @@ damping_ratio = 0.4
 antiroll_bar_stiffness = 5000.0
 
 [sub_resource type="VehicleConfig" id="VehicleConfig_hl4on"]
+engine_reaction_data = SubResource("EngineReactionData_kkclv")
 engine_data = SubResource("VehicleEngineData_v40a1")
 gearbox_data = SubResource("GearboxData_p21br")
 suspension_data = SubResource("SuspensionData_7jkea")
 aero_data = SubResource("VehicleAerodynamicsData_6yyhk")
+esc_data = SubResource("ESCData_6yyhk")
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_mt10o"]
 points = PackedVector3Array(0.70895374, -0.7459604, 0.8402614, -0.7260659, -0.74632007, 0.8401434, 0.65163165, 1.8372062, 0.72555965, 0.53670645, -1.7796587, 0.26628053, -0.5538186, 1.6073756, 0.26628053, -0.38157126, 1.8372062, 1.4143603, 0.37968266, -0.20663056, 1.3552152, -0.49649647, -1.7796587, 0.26628053, 0.53670645, 1.6073756, 0.26628053, 0.65163165, 1.8372062, 1.2994225, 0.1922118, -1.6073756, 0.89749426, -0.61128116, 1.8372062, 1.3567734, -0.34650946, -0.2075758, 1.3577021, -0.38157126, -1.205262, 0.20881164, -0.5538186, -1.7796587, 0.55327094, 0.70895374, -0.63122493, 1.069783, 0.24967441, 1.3771853, 0.20881164, -0.20932394, -1.6073756, 0.89749426, 0.42192173, 1.8372062, 1.4143603, 0.42192173, -1.8372062, 0.55327094, 0.36445913, -1.205262, 0.20881164, -0.5564118, -0.20825402, 1.307142, -0.7260659, -0.63122493, 1.069783, 0.5974008, -0.21062113, 1.2593493, 0.53670645, -1.7796587, 0.55327094, -0.32410866, -1.8372062, 0.6107398, -0.5538186, -1.7796587, 0.38110033, 0.36445913, -1.4926401, 0.89749426, -0.7260659, -0.63122493, 0.8401434, -0.5658, 1.6985722, 0.6258955, -0.43903387, 1.7796587, 1.4143603, -0.38157126, -1.4347329, 0.89749426)
 
 [sub_resource type="Curve" id="Curve_ei00m"]
 _limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.21551722, 1), 0.0, 0.0, 0, 0, Vector2(0.49784482, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.65271974), 0.0, 0.0, 0, 0]
-point_count = 5
+_data = [Vector2(0, 0), 0.0, 2.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.8), 0.0, 0.0, 0, 0]
+point_count = 3
 
 [sub_resource type="Curve" id="Curve_ugfer"]
 _limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 0.10468469, 0, 0, Vector2(1.0043104, 0.9916319), 0.0, 0.0, 0, 0, Vector2(2, 0.8577407), 0.0, 0.0, 0, 0]
+_data = [Vector2(0, 0), 0.0, 2.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0, Vector2(2, 0.85), 0.0, 0.0, 0, 0]
 point_count = 3
 
 [sub_resource type="TireData" id="TireData_2hm57"]
-lateral_response_angle = 12.0
+lateral_response_angle = 9.0
 radius = 0.55
 tire_width = 0.3
 brake_power = 4000.0
@@ -103,20 +113,32 @@ mode = 2
 
 [sub_resource type="VehicleAerodynamicsData" id="VehicleAerodynamicsData_gi0ev"]
 drag_coefficient = 0.52
-downforce_coefficient = 0.16
-yaw_damping_coefficient = 1.0
-yaw_control_max_torque = 4000.0
+downforce_coefficient = 0.22
 
 [sub_resource type="Curve" id="Curve_n51mc"]
-_data = [Vector2(0, 0.41841012), 0.0, 2.5034132, 0, 0, Vector2(0.14446229, 0.89728093), 0.4609414, 0.4609414, 0, 0, Vector2(0.8340517, 1), 0.0, 0.0, 0, 0, Vector2(0.99568963, 0.6401675), 0.0, 0.0, 0, 0]
-point_count = 4
+_data = [Vector2(0, 0.48821545), 0.0, 0.4488526, 0, 0, Vector2(0.81737584, 1), 0.0, 0.0, 0, 0, Vector2(0.99568963, 0.6401675), 0.0, 0.0, 0, 0]
+point_count = 3
 
 [sub_resource type="VehicleEngineData" id="VehicleEngineData_l7kk7"]
 torque_curve = SubResource("Curve_n51mc")
 redline_rpm = 7000.0
-inertia = 0.6
+inertia = 0.45
 max_torque = 600.0
-engine_braking = 0.3
+engine_drag = 0.04
+engine_braking = 0.35
+
+[sub_resource type="EngineReactionData" id="EngineReactionData_jaewe"]
+reaction_strength = 2.0
+maximum_torque = 5000.0
+vibration_strength = 3.0
+idle_vibration_max_rpm = 1300.0
+idle_vibration_multiplier = 2.0
+speed_fade_end_kph = 55.0
+
+[sub_resource type="ESCData" id="ESCData_gi0ev"]
+yaw_damping = 1.0
+maximum_corrective_torque = 5000.0
+maximum_target_lateral_acceleration = 7.0
 
 [sub_resource type="GearboxData" id="GearboxData_c52e2"]
 gear_ratios = PackedFloat64Array(5, 3, 2.2, 1.6, 1.2, 0.9)
@@ -131,19 +153,25 @@ suspension_length = 0.5
 damping_ratio = 0.6
 antiroll_bar_stiffness = 2000.0
 
+[sub_resource type="TurboData" id="TurboData_kkclv"]
+max_boost_bar = 1.5
+full_boost_rpm = 3500.0
+
 [sub_resource type="VehicleConfig" id="VehicleConfig_example"]
+engine_reaction_data = SubResource("EngineReactionData_jaewe")
 engine_data = SubResource("VehicleEngineData_l7kk7")
 gearbox_data = SubResource("GearboxData_c52e2")
 suspension_data = SubResource("SuspensionData_yivbd")
 aero_data = SubResource("VehicleAerodynamicsData_gi0ev")
+esc_data = SubResource("ESCData_gi0ev")
+turbo_data = SubResource("TurboData_kkclv")
 
 [sub_resource type="TireData" id="TireData_8lvy3"]
-friction_lateral = 1.15
-lateral_response_angle = 12.0
+friction_lateral = 1.1
+lateral_response_angle = 9.0
 tire_width = 0.3
 brake_power = 600.0
 force_response_low_speed_ms = 60.0
-combined_grip_exponent = 4.0
 forward_friction_curve = SubResource("Curve_ei00m")
 lateral_friction_curve = SubResource("Curve_ugfer")
 
@@ -152,7 +180,7 @@ lateral_friction_curve = SubResource("Curve_ugfer")
 [sub_resource type="SteeringRackData" id="SteeringRackData_n51mc"]
 max_angle = 33.0
 response_time_ms = 500.0
-steering_half_speed_kph = 70.0
+steering_half_speed_kph = 55.0
 road_feedback_strength = 0.6
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_porlw"]
@@ -162,19 +190,18 @@ height = 0.3
 
 [sub_resource type="TireData" id="TireData_n51mc"]
 friction_lateral = 1.15
-lateral_response_angle = 12.0
+lateral_response_angle = 9.0
 tire_width = 0.3
 brake_power = 600.0
 force_response_low_speed_ms = 60.0
-combined_grip_exponent = 4.0
 forward_friction_curve = SubResource("Curve_ei00m")
 lateral_friction_curve = SubResource("Curve_ugfer")
 
 [sub_resource type="DifferentialData" id="DifferentialData_example"]
 mode = 1
 acceleration_lock_percent = 25.0
-engine_braking_lock_percent = 10.0
-preload_torque = 15.0
+engine_braking_lock_percent = 15.0
+preload_torque = 21.0
 max_lock_torque = 180.0
 speed_lock_torque_per_100_rpm = 3.1415927
 
@@ -739,6 +766,7 @@ angular_damp_mode = 1
 
 [node name="Axle2" type="Axle" parent="Vehicle1" unique_id=278175441]
 is_steerable = true
+drive_share = 0.5
 tire_data = SubResource("TireData_8lvy3")
 differential_data = SubResource("DifferentialData_8lvy3")
 steering_rack_data = SubResource("SteeringRackData_n51mc")
@@ -759,7 +787,7 @@ transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0
 mesh = SubResource("CylinderMesh_porlw")
 
 [node name="Axle" type="Axle" parent="Vehicle1" unique_id=2062533440]
-drive_share = 1.0
+drive_share = 0.5
 tire_data = SubResource("TireData_n51mc")
 differential_data = SubResource("DifferentialData_example")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06861514, -1.1780977)
@@ -838,8 +866,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)
 current = true
 script = ExtResource("1_chasecam")
 target = NodePath("../Vehicle1")
-distance = 5.0
-height = 2.5
+distance = 4.0
+height = 2.25
 
 [node name="ChaseCamera2" type="Camera3D" parent="." unique_id=1555204180 node_paths=PackedStringArray("target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 12)

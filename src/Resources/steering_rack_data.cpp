@@ -19,6 +19,13 @@ void SteeringRackData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_road_feedback_strength"), &SteeringRackData::get_road_feedback_strength);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "road_feedback_strength", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater"), "set_road_feedback_strength", "get_road_feedback_strength");
     ADD_GROUP("Advanced", "");
+    ClassDB::bind_method(D_METHOD("set_max_feedback_deflection_deg", "value"), &SteeringRackData::set_max_feedback_deflection_deg);
+    ClassDB::bind_method(D_METHOD("get_max_feedback_deflection_deg"), &SteeringRackData::get_max_feedback_deflection_deg);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_feedback_deflection_deg", PROPERTY_HINT_RANGE, "0,80,0.1,suffix:deg"), "set_max_feedback_deflection_deg", "get_max_feedback_deflection_deg");
+    ClassDB::bind_method(D_METHOD("set_minimum_driver_authority", "value"), &SteeringRackData::set_minimum_driver_authority);
+    ClassDB::bind_method(D_METHOD("get_minimum_driver_authority"), &SteeringRackData::get_minimum_driver_authority);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "minimum_driver_authority", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_minimum_driver_authority", "get_minimum_driver_authority");
+
     ClassDB::bind_method(D_METHOD("set_friction_torque", "value"), &SteeringRackData::set_friction_torque);
     ClassDB::bind_method(D_METHOD("get_friction_torque"), &SteeringRackData::get_friction_torque);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_torque", PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:Nm"), "set_friction_torque", "get_friction_torque");
@@ -39,5 +46,10 @@ void SteeringRackData::set_road_feedback_strength(real_t value) {
 void SteeringRackData::set_friction_torque(real_t value) {
     friction_torque = std::isfinite(value) ? std::clamp(value, real_t{0}, real_t{1000}) : real_t{0.3};
 }
+
+
+void SteeringRackData::set_max_feedback_deflection_deg(real_t value) { if (std::isfinite(value)) max_feedback_deflection_deg = std::clamp(value, real_t{0.0}, real_t{80.0}); }
+
+void SteeringRackData::set_minimum_driver_authority(real_t value) { if (std::isfinite(value)) minimum_driver_authority = std::clamp(value, real_t{0.0}, real_t{1.0}); }
 
 } // namespace godot

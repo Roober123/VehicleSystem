@@ -6,6 +6,8 @@
 namespace godot {
 
 void VehicleTelemetry::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_engine_reaction_telemetry"), &VehicleTelemetry::get_engine_reaction_telemetry);
+    ClassDB::bind_method(D_METHOD("get_handling_telemetry"), &VehicleTelemetry::get_handling_telemetry);
     ClassDB::bind_method(D_METHOD("set_target", "vehicle"), &VehicleTelemetry::set_target);
     ClassDB::bind_method(D_METHOD("get_target"), &VehicleTelemetry::get_target);
 
@@ -128,7 +130,60 @@ Dictionary VehicleTelemetry::get_tire_telemetry(Wheel *wheel) const {
     data["abs_active"] = wheel->get_abs_active();
     data["contact_position"] = wheel->get_collision_point();
     data["contact_normal"] = wheel->get_collision_normal();
+    data["wheel_forward"] = wheel->forward_vector;
+    data["wheel_right"] = wheel->right_vector;
+    data["lateral_force"] = wheel->prev_lateral_force;
+    data["longitudinal_force"] = wheel->prev_longitudinal_force;
+    data["sat"] = wheel->self_aligning_torque;
     data["grip_multiplier"] = wheel->get_grip_multiplier();
+    return data;
+}
+
+Dictionary VehicleTelemetry::get_handling_telemetry() const {
+    Dictionary data;
+    if (target == nullptr) return data;
+    // Read the completed physics snapshot directly, also in headless audits
+    // where render/process callbacks may be less frequent than physics ticks.
+    const auto current = target->get_telemetry_snapshot();
+    const auto &esc = current.stability;
+    data["esc_yaw_target"] = esc.yaw_target;
+    data["esc_yaw_error"] = esc.yaw_error;
+    data["esc_requested_torque"] = esc.requested_torque;
+    data["esc_applied_torque"] = esc.applied_torque;
+    data["esc_cap_active"] = esc.cap_active;
+    data["esc_slew_active"] = esc.slew_active;
+    data["esc_speed_gate"] = esc.speed_gate;
+    data["esc_supported"] = esc.supported;
+    data["sideslip"] = current.handling.sideslip;
+    data["sideslip_trend"] = current.handling.sideslip_trend;
+    data["sideslip_valid"] = current.handling.sideslip_valid;
+    data["yaw_rate"] = current.handling.yaw_rate;
+    data["yaw_acceleration"] = current.handling.yaw_acceleration;
+    data["lateral_acceleration"] = current.handling.lateral_acceleration;
+    data["driver_steering"] = current.driver_steering;
+    for (const Axle *axle : target->get_wheel_views()) {
+        if (!axle->get_steerable()) continue;
+        const auto &rack = axle->get_steering_rack();
+        data["rack_target"] = rack.get_target();
+        data["rack_actual"] = rack.get_angle();
+        data["sat_raw"] = rack.get_raw_feedback();
+        data["sat_applied"] = rack.get_applied_feedback();
+        break;
+    }
+    return data;
+}
+
+Dictionary VehicleTelemetry::get_engine_reaction_telemetry() const {
+    Dictionary data;
+    if (target == nullptr) return data;
+    const auto current = target->get_telemetry_snapshot();
+    data["generated_torque"] = current.engine_generated_torque;
+    data["reaction_torque"] = current.engine_reaction.reaction_torque;
+    data["vibration_torque"] = current.engine_reaction.vibration_torque;
+    data["vibration_amplitude"] = current.engine_reaction.vibration_amplitude;
+    data["vibration_frequency"] = current.engine_reaction.vibration_frequency;
+    data["speed_factor"] = current.engine_reaction.speed_factor;
+    data["chassis_torque"] = current.engine_chassis_torque;
     return data;
 }
 

@@ -3,6 +3,8 @@
 #include "godot_cpp/classes/resource.hpp"
 #include "godot_cpp/core/class_db.hpp"
 
+#include "Resources/esc_data.h"
+#include "Resources/engine_reaction_data.h"
 #include "Resources/gearbox_data.h"
 #include "Resources/suspension_data.h"
 #include "Resources/turbo_data.h"
@@ -22,6 +24,8 @@ class VehicleConfig : public Resource {
     Ref<SuspensionData> suspension_data;
     Ref<VehicleAerodynamicsData> aero_data;
     Ref<TurboData> turbo_data;
+    Ref<ESCData> esc_data;
+    Ref<EngineReactionData> engine_reaction_data;
 
 protected:
     static void _bind_methods();
@@ -41,6 +45,12 @@ public:
 
     void set_aero_data(const Ref<VehicleAerodynamicsData> &value) { aero_data = value; }
     Ref<VehicleAerodynamicsData> get_aero_data() const { return aero_data; }
+
+    void set_esc_data(const Ref<ESCData> &value) { esc_data = value; }
+    Ref<ESCData> get_esc_data() const { return esc_data; }
+
+    void set_engine_reaction_data(const Ref<EngineReactionData> &value) { engine_reaction_data = value; }
+    Ref<EngineReactionData> get_engine_reaction_data() const { return engine_reaction_data; }
 
     void set_turbo_data(const Ref<TurboData> &value) { turbo_data = value; }
     Ref<TurboData> get_turbo_data() const { return turbo_data; }

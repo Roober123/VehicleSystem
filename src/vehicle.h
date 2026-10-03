@@ -11,12 +11,29 @@
 #include "Resources/vehicle_config.h"
 #include "VehicleDrivetrain.h"
 #include "VehicleRunningGear.h"
+#include "VehicleStabilityControl.h"
+#include "VehicleEngineReaction.h"
 
 namespace godot {
+
+struct HandlingTelemetry {
+    real_t sideslip = 0.0;
+    real_t sideslip_trend = 0.0;
+    real_t yaw_rate = 0.0;
+    real_t yaw_acceleration = 0.0;
+    real_t lateral_acceleration = 0.0;
+    bool sideslip_valid = false;
+};
 
 /// Immutable-by-value scalar view used by telemetry consumers. It deliberately
 /// contains no references into the live drivetrain or running gear.
 struct VehicleTelemetrySnapshot {
+    EngineReactionSample engine_reaction;
+    Vector3 engine_chassis_torque;
+    real_t engine_generated_torque = 0.0;
+    StabilityTelemetry stability;
+    HandlingTelemetry handling;
+    real_t driver_steering = 0.0;
     real_t engine_rpm = 0.0;
     real_t engine_torque = 0.0;
     real_t engine_throttle = 0.0;
@@ -38,6 +55,14 @@ class Vehicle : public RigidBody3D {
 
     VehicleRunningGear running_gear;
     VehicleDrivetrain drivetrain;
+    VehicleStabilityControl stability_control;
+    VehicleEngineReaction engine_reaction;
+    EngineReactionSample engine_reaction_sample;
+    Vector3 engine_chassis_torque;
+    Vector3 engine_axis = Vector3(0.0, 0.0, 1.0);
+    HandlingTelemetry handling_sample;
+    Vector3 previous_velocity;
+    bool handling_history_valid = false;
     Ref<VehicleConfig> config = nullptr;
     Marker3D *center_of_mass_marker = nullptr;
 
@@ -66,6 +91,9 @@ public:
 
     void set_center_of_mass_marker(Marker3D *value) { center_of_mass_marker = value; }
     Marker3D *get_center_of_mass_marker() const { return center_of_mass_marker; }
+
+    void set_engine_axis(const Vector3 &value);
+    Vector3 get_engine_axis() const { return engine_axis; }
 
     void set_throttle_input(real_t value);
     real_t get_throttle_input() const { return throttle_input; }

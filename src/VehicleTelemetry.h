@@ -52,6 +52,8 @@ public:
     real_t get_wheel_rpm(Wheel *wheel) const;
     Vector3 get_tire_force(Wheel *wheel) const;
     Dictionary get_tire_telemetry(Wheel *wheel) const;
+    Dictionary get_handling_telemetry() const;
+    Dictionary get_engine_reaction_telemetry() const;
 };
 
 } // namespace godot

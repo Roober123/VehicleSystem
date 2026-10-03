@@ -17,6 +17,9 @@ void TireData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_friction_lateral", "value"), &TireData::set_friction_lateral);
     ClassDB::bind_method(D_METHOD("get_friction_lateral"), &TireData::get_friction_lateral);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_lateral", PROPERTY_HINT_RANGE, "0,2,0.05"), "set_friction_lateral", "get_friction_lateral");
+    ClassDB::bind_method(D_METHOD("set_peak_slip_ratio", "value"), &TireData::set_peak_slip_ratio);
+    ClassDB::bind_method(D_METHOD("get_peak_slip_ratio"), &TireData::get_peak_slip_ratio);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak_slip_ratio", PROPERTY_HINT_RANGE, "0.01,1,0.01"), "set_peak_slip_ratio", "get_peak_slip_ratio");
     ClassDB::bind_method(D_METHOD("set_lateral_response_angle", "value"), &TireData::set_lateral_response_angle);
     ClassDB::bind_method(D_METHOD("get_lateral_response_angle"), &TireData::get_lateral_response_angle);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lateral_response_angle", PROPERTY_HINT_RANGE, "0.1,25,0.5,degrees"), "set_lateral_response_angle", "get_lateral_response_angle");
@@ -54,6 +57,7 @@ void TireData::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_combined_grip_exponent", "value"), &TireData::set_combined_grip_exponent);
     ClassDB::bind_method(D_METHOD("get_combined_grip_exponent"), &TireData::get_combined_grip_exponent);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "combined_grip_exponent", PROPERTY_HINT_RANGE, "1,16,0.1"), "set_combined_grip_exponent", "get_combined_grip_exponent");
+    ADD_GROUP("Grip Curves", "");
     ClassDB::bind_method(D_METHOD("set_forward_friction_curve", "value"), &TireData::set_forward_friction_curve);
     ClassDB::bind_method(D_METHOD("get_forward_friction_curve"), &TireData::get_forward_friction_curve);
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "forward_friction_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_forward_friction_curve", "get_forward_friction_curve");
@@ -67,6 +71,9 @@ void TireData::set_friction_forward(real_t value) {
 }
 void TireData::set_friction_lateral(real_t value) {
     friction_lateral = bounded(value, real_t{0}, real_t{2}, real_t{1.0});
+}
+void TireData::set_peak_slip_ratio(real_t value) {
+    peak_slip_ratio = bounded(value, real_t{0.01}, real_t{1.0}, real_t{0.15});
 }
 void TireData::set_lateral_response_angle(real_t value) {
     lateral_response_angle = bounded(value, real_t{0.1}, real_t{90}, real_t{10.0});

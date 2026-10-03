@@ -16,6 +16,8 @@ class VehicleEngine : public RotationalBody {
 
     bool rev_limit_cut = false;
     real_t effective_drive_torque = 0.0;
+    real_t generated_torque = 0.0;
+    real_t self_torque = 0.0;
 
     Turbo* turbo = nullptr;
     
@@ -40,6 +42,10 @@ class VehicleEngine : public RotationalBody {
 
     real_t get_rpm_normalized() const;
     real_t get_torque() const;
+    // Generated torque includes idle support; self torque also subtracts
+    // braking/drag. Both are cached before clutch coupling changes the body.
+    real_t get_generated_torque() const { return generated_torque; }
+    real_t get_self_torque() const { return self_torque; }
     real_t get_idle_rpm() const { return idle_rpm; }
     real_t get_redline_rpm() const { return redline_rpm; }
     real_t get_turbo_boost() const;

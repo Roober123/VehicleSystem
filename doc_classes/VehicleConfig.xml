@@ -4,7 +4,7 @@
 		Aggregate of Vehicle setup resources used during initialization and restart.
 	</brief_description>
 	<description>
-		VehicleConfig supplies resources copied during Vehicle initialization or [method Vehicle.restart]. Engine, gearbox, and suspension data are required. Aerodynamics and turbo data are optional. Direct drivetrain setup copies each driven axle's two wheel bodies, positive [member Axle.drive_share], and [member Axle.differential_data] into [code]DrivenAxle[/code] and [code]DifferentialSettings[/code] values. One through eight driven axles are supported; positive shares are normalized as flat weights with no inter-axle differential. The network receives direct solve arguments for timestep, signed ratio, engagement, and clutch capacity, and retains [code]ClutchTelemetry[/code] after successful atomic commit. VehicleSetupValidation reports missing major resources and invalid composition before runtime state is configured. Replacing this resource or editing referenced resources does not reconfigure active copied runtime state; those changes take effect after a successful [method Vehicle.restart].
+		VehicleConfig supplies resources copied during Vehicle initialization or [method Vehicle.restart]. Engine, gearbox, and suspension data are required. Aerodynamics, ESC, and turbo data are optional. Missing ESC data disables yaw stabilization. Direct drivetrain setup copies each driven axle's two wheel bodies, positive [member Axle.drive_share], and [member Axle.differential_data] into [code]DrivenAxle[/code] and [code]DifferentialSettings[/code] values. One through eight driven axles are supported; positive shares are normalized as flat weights with no inter-axle differential. The network receives direct solve arguments for timestep, signed ratio, engagement, and clutch capacity, and retains [code]ClutchTelemetry[/code] after successful atomic commit. VehicleSetupValidation reports missing major resources and invalid composition before runtime state is configured. Replacing this resource or editing referenced resources does not reconfigure active copied runtime state; those changes take effect after a successful [method Vehicle.restart].
 	</description>
 	<tutorials>
 	</tutorials>
@@ -37,6 +37,13 @@
 		<method name="get_aero_data" qualifiers="const">
 			<return type="VehicleAerodynamicsData" /><description>Returns optional aerodynamics configuration data.</description>
 		</method>
+		<method name="set_esc_data" qualifiers="">
+			<return type="void" /><param index="0" name="data" type="ESCData" />
+			<description>Sets optional stability-control data. Null disables ESC after setup or restart.</description>
+		</method>
+		<method name="get_esc_data" qualifiers="const">
+			<return type="ESCData" /><description>Returns optional stability-control data.</description>
+		</method>
 		<method name="set_turbo_data" qualifiers="">
 			<return type="void" /><param index="0" name="data" type="TurboData" />
 			<description>Sets optional turbo configuration data.</description>
@@ -46,10 +53,12 @@
 		</method>
 	</methods>
 	<members>
+        <member name="engine_reaction_data" type="EngineReactionData" setter="set_engine_reaction_data" getter="get_engine_reaction_data">Optional engine reaction and vibration tuning. Null disables the effect. Copied at setup or restart.</member>
 		<member name="engine_data" type="VehicleEngineData" setter="set_engine_data" getter="get_engine_data">Required engine data.</member>
 		<member name="gearbox_data" type="GearboxData" setter="set_gearbox_data" getter="get_gearbox_data">Required gearbox and clutch data.</member>
 		<member name="suspension_data" type="SuspensionData" setter="set_suspension_data" getter="get_suspension_data">Required suspension data.</member>
 		<member name="aero_data" type="VehicleAerodynamicsData" setter="set_aero_data" getter="get_aero_data">Optional aerodynamics data.</member>
+		<member name="esc_data" type="ESCData" setter="set_esc_data" getter="get_esc_data">Optional stability-control data. Null disables ESC.</member>
 		<member name="turbo_data" type="TurboData" setter="set_turbo_data" getter="get_turbo_data">Optional turbo data.</member>
 	</members>
 </class>

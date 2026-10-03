@@ -31,7 +31,8 @@ class Wheel : public Node3D {
     real_t combined_grip_exponent = 2.0;
     real_t grip_multiplier = 1.0;
 
-    // tanh tire model parameters
+    // Normalized tire response scales (also used by the tanh fallback).
+    real_t peak_slip_ratio = 0.15;
     real_t peak_slip_angle = 10.0;     // degrees
     real_t pneumatic_trail = 0.02;     // metres
     real_t mechanical_trail = 0.02;    // metres
@@ -50,7 +51,7 @@ class Wheel : public Node3D {
     void _compute_sat(real_t lateral_force);
 
     // Tangent vectors relative to contact surface
-    void _compute_tangents(Vector3& fwd_tangent, Vector3& right_tangent) const;
+    bool _compute_tangents(Vector3& fwd_tangent, Vector3& right_tangent) const;
 
     // Slip computation (sets slip_ratio, slip_angle, is_sliding)
     void _compute_slip(real_t fwd_speed, real_t lat_speed, real_t& slip_vel, real_t& slip_angle_rad);
@@ -58,9 +59,8 @@ class Wheel : public Node3D {
     // Normal force from sustained mass
     real_t _compute_normal_force() const;
 
-    // Raw friction forces using tanh model
-    void _compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angle_rad,
-                             real_t fwd_speed, real_t lat_speed,
+    // Raw friction forces using editable curves or the tanh fallback.
+    void _compute_raw_forces(real_t normal, real_t slip_vel, real_t slip_angle_rad, real_t forward_speed,
                              real_t& raw_fwd_force, real_t& raw_lat_force,
                              real_t& fwd_mu, real_t& lat_mu) const;
 
@@ -69,9 +69,9 @@ class Wheel : public Node3D {
                            real_t fwd_mu, real_t lat_mu,
                            real_t& out_fwd, real_t& out_lat) const;
 
-    // Exponential force response with a speed-dependent time constant.
-    void _apply_relaxation(real_t& longitudinal_force, real_t& lateral_force,
-                           real_t dt, const Vector3& linear_velocity);
+    // Exponential slip response based on road speed through the contact patch.
+    void _update_relaxed_slip(real_t target_slip_velocity, real_t target_slip_angle,
+                              real_t forward_speed, real_t dt);
 
     // Apply combined tire forces to body
     void _apply_tire_forces(const Vector3& fwd_tangent, const Vector3& right_tangent,
@@ -87,9 +87,9 @@ class Wheel : public Node3D {
                            real_t normal_load,
                            real_t dt);
 
-    // Apply brakes with optional ABS
-    void _apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed,
-                       real_t dt, real_t normal, const Vector3& fwd_tangent);
+    // Apply rotational brakes and return the requested longitudinal hold force.
+    real_t _apply_brakes(real_t brake_input, bool abs_enabled, real_t fwd_speed,
+                         real_t dt, real_t normal);
 
     protected:
     static void _bind_methods();
@@ -124,8 +124,8 @@ class Wheel : public Node3D {
     Vector3 get_collision_normal() const { return collision_normal; }
     /// Returns true if the wheel raycast is currently touching a surface.
     bool is_on_ground() const { return on_ground; }
-    /// Returns the longitudinal slip ratio (tire_speed - road_speed) / road_speed.
-    /// 0 = rolling, 1 = spinning, -1 = locked.
+    /// Returns (tire_speed - road_speed) / hypot(road_speed, 3 m/s).
+    /// At road speeds well above 3 m/s: 0 = rolling, -1 = locked moving forward.
     real_t get_slip_ratio() const { return slip_ratio; }
     real_t get_slip_angle() const { return slip_angle; }
     bool get_is_sliding() const { return is_sliding; }
@@ -155,6 +155,8 @@ class Wheel : public Node3D {
 
     real_t prev_longitudinal_force = 0.0;
     real_t prev_lateral_force = 0.0;
+    real_t relaxed_slip_velocity = 0.0;
+    real_t relaxed_slip_angle = 0.0; // radians
 
     real_t instability_cooldown = 0.0;
     int oscillation_count = 0;

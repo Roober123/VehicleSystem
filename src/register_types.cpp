@@ -12,6 +12,8 @@
 #include "Resources/gearbox_data.h"
 #include "Resources/vehicle_aerodynamics_data.h"
 #include "Resources/tire_data.h"
+#include "Resources/esc_data.h"
+#include "Resources/engine_reaction_data.h"
 #include "Resources/steering_rack_data.h"
 #include "Resources/differential_data.h"
 
@@ -35,6 +37,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	}
 	GDREGISTER_CLASS(TurboData);
 	GDREGISTER_CLASS(DifferentialData);
+	GDREGISTER_CLASS(ESCData);
+	GDREGISTER_CLASS(EngineReactionData);
 	GDREGISTER_CLASS(VehicleConfig);
 	GDREGISTER_CLASS(VehicleAerodynamicsData);
 	GDREGISTER_CLASS(SuspensionData);

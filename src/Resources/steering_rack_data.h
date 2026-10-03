@@ -6,11 +6,14 @@ namespace godot {
 // Smooth critically damped steering; response time is its no-feedback 90% time.
 class SteeringRackData : public Resource {
     GDCLASS(SteeringRackData, Resource);
-
 protected:
     static void _bind_methods();
 
 public:
+    void set_max_feedback_deflection_deg(real_t value);
+    real_t get_max_feedback_deflection_deg() const { return max_feedback_deflection_deg; }
+    void set_minimum_driver_authority(real_t value);
+    real_t get_minimum_driver_authority() const { return minimum_driver_authority; }
     void set_max_angle(real_t value);
     real_t get_max_angle() const { return max_angle; }
     void set_response_time_ms(real_t value);
@@ -23,6 +26,8 @@ public:
     real_t get_friction_torque() const { return friction_torque; }
 
 private:
+    real_t max_feedback_deflection_deg = 5.0;
+    real_t minimum_driver_authority = 0.65;
     real_t max_angle = 35.0;
     real_t response_time_ms = 160.0;
     real_t steering_half_speed_kph = 50.0;

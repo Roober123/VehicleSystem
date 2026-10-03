@@ -3,6 +3,7 @@
 #include "vehicle_setup_validation.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
@@ -10,6 +11,10 @@
 namespace godot {
 
 void Vehicle::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_engine_axis", "axis"), &Vehicle::set_engine_axis);
+    ClassDB::bind_method(D_METHOD("get_engine_axis"), &Vehicle::get_engine_axis);
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "engine_axis"), "set_engine_axis", "get_engine_axis");
+
     ADD_SIGNAL(MethodInfo("vehicle_ready"));
 
     ClassDB::bind_method(D_METHOD("set_config", "config"), &Vehicle::set_config);
@@ -106,6 +111,7 @@ bool Vehicle::initialize_runtime() {
     drivetrain.reset_runtime_state();
     running_gear.setup(setup_axles, get_mass(), config->get_suspension_data(),
                        config->get_aero_data());
+    stability_control.load_parameters(config->get_esc_data());
     String drivetrain_error;
     if (!drivetrain.setup(config, running_gear.get_axles(), drivetrain_error)) {
         UtilityFunctions::printerr(String("Vehicle drivetrain setup failed: ") +
@@ -114,6 +120,9 @@ bool Vehicle::initialize_runtime() {
     }
 
     initialized = true;
+    engine_reaction.configure(config->get_engine_reaction_data());
+    engine_reaction_sample = EngineReactionSample();
+    engine_chassis_torque = Vector3();
     emit_signal("vehicle_ready");
     return true;
 }
@@ -124,17 +133,50 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
         return;
 
     const Vector3 body_origin = state->get_transform().get_origin();
-    const Vector3 com_global = state->get_transform().xform(state->get_center_of_mass());
+    // Direct body state returns the COM offset in world axes, relative to the body origin.
+    const Vector3 com_global = body_origin + state->get_center_of_mass();
     const Vector3 linear_velocity = state->get_linear_velocity();
     const Vector3 angular_velocity = state->get_angular_velocity();
 
-    // Explicit frame phases. Running gear applies suspension and aero forces
-    // before the drivetrain starts its frame/substep sequence.
+    // Bounded diagnostic history; no allocations in the physics path.
+    const real_t sample_dt = state->get_step();
+    const Basis frame = state->get_transform().basis.orthonormalized();
+    const Vector3 local_velocity = frame.xform_inv(linear_velocity);
+    const real_t beta = std::atan2(local_velocity.x, local_velocity.z);
+    const real_t yaw = angular_velocity.dot(frame.get_column(1));
+    const bool valid_sample = linear_velocity.is_finite() && angular_velocity.is_finite() &&
+        std::isfinite(sample_dt) && sample_dt > real_t{0.0};
+    const bool beta_valid = valid_sample && local_velocity.z >= real_t{3.0};
+    if (valid_sample && handling_history_valid) {
+        handling_sample.yaw_acceleration = (yaw - handling_sample.yaw_rate) / sample_dt;
+        handling_sample.lateral_acceleration = (linear_velocity - previous_velocity).dot(frame.get_column(0)) / sample_dt;
+        if (beta_valid && handling_sample.sideslip_valid) {
+            const real_t derivative = std::clamp<real_t>(std::remainder(beta - handling_sample.sideslip, real_t{2.0} * Math_PI) / sample_dt,
+                real_t{-10.0}, real_t{10.0});
+            handling_sample.sideslip_trend += (real_t{1.0} - std::exp(-sample_dt / real_t{0.1})) * (derivative - handling_sample.sideslip_trend);
+        } else {
+            handling_sample.sideslip_trend = 0.0;
+        }
+    } else {
+        handling_sample = HandlingTelemetry();
+    }
+    handling_sample.sideslip = valid_sample ? beta : real_t{0.0};
+    handling_sample.yaw_rate = valid_sample ? yaw : real_t{0.0};
+    handling_sample.sideslip_valid = beta_valid;
+    previous_velocity = linear_velocity;
+    handling_history_valid = valid_sample;
+
+    // Suspension, aerodynamics and ESC precede drivetrain/tire substeps.
     running_gear.update_suspension(this, body_origin, com_global,
                                    linear_velocity, angular_velocity);
-    running_gear.apply_aerodynamics(this, get_global_transform().basis,
-                                    linear_velocity, angular_velocity,
-                                    get_mass(), body_origin);
+    running_gear.apply_aerodynamics(this, linear_velocity, body_origin);
+    stability_control.load_parameters(config.is_valid() ? config->get_esc_data() : Ref<ESCData>());
+    const StabilityState stability_state = stability_control.get_state(
+        state->get_transform().basis, linear_velocity, angular_velocity,
+        get_mass(), running_gear.get_axles());
+    const Vector3 stability_torque = stability_control.update(stability_state, state->get_step());
+    if (stability_torque.length_squared() > real_t{1e-8})
+        apply_torque(stability_torque);
 
     drivetrain.handle_auto_gearbox(get_speed_kph(), brake_input, throttle_input);
     if (drivetrain.is_reverse()) {
@@ -148,17 +190,33 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
 
     const real_t dt = state->get_step();
     const real_t sub_dt = dt / static_cast<real_t>(substeps);
+    engine_reaction_sample = EngineReactionSample();
+    engine_chassis_torque = Vector3();
 
     // Gear selection is evaluated once at frame time. Clutch phase progress is
     // advanced inside each drivetrain substep below.
     drivetrain.update_shifting_logic(dt);
 
     const real_t wheel_brake = drivetrain.is_reverse() ? throttle_input : brake_input;
-    const real_t speed_kph = get_speed_kph();
+    const real_t speed_kph = linear_velocity.length() * real_t{3.6};
 
     for (int substep = 0; substep < substeps; ++substep) {
         drivetrain.update_clutch_logic(sub_dt, wheel_brake, throttle_input);
         drivetrain.accumulate_engine_torque(sub_dt);
+
+        if (!engine_axis.is_zero_approx()) {
+            const VehicleEngine &engine = drivetrain.get_engine();
+            const EngineReactionSample sample = engine_reaction.update(
+                    engine.get_generated_torque(), engine.get_self_torque(),
+                    engine.get_rpm(), engine.get_idle_rpm(), engine.get_redline_rpm(),
+                    sub_dt, dt, speed_kph);
+            // Accumulate angular impulse; convert to frame-average torque below.
+            engine_reaction_sample.reaction_torque += sample.reaction_torque * sub_dt;
+            engine_reaction_sample.vibration_torque += sample.vibration_torque * sub_dt;
+            engine_reaction_sample.vibration_amplitude += sample.vibration_amplitude * sub_dt;
+            engine_reaction_sample.vibration_frequency += sample.vibration_frequency * sub_dt;
+            engine_reaction_sample.speed_factor += sample.speed_factor * sub_dt;
+        }
 
         // Current tire and brake reaction torques remain pending on wheel
         // bodies so coupling sees exactly the loads integrated below.
@@ -173,6 +231,24 @@ void Vehicle::_integrate_forces(PhysicsDirectBodyState3D *state) {
     }
 
     running_gear.apply_tire_forces(this, body_origin, substeps);
+    if (std::isfinite(dt) && dt > real_t{0.0}) {
+        engine_reaction_sample.reaction_torque /= dt;
+        engine_reaction_sample.vibration_torque /= dt;
+        engine_reaction_sample.vibration_amplitude /= dt;
+        engine_reaction_sample.vibration_frequency /= dt;
+        engine_reaction_sample.speed_factor /= dt;
+        engine_chassis_torque = frame.xform(engine_axis) * engine_reaction_sample.total_torque();
+        if (engine_chassis_torque.is_finite() && !engine_chassis_torque.is_zero_approx())
+            state->apply_torque(engine_chassis_torque);
+    }
+}
+
+void Vehicle::set_engine_axis(const Vector3 &value) {
+    if (!value.is_finite())
+        return;
+    // Scale before normalization to avoid overflow with large authored vectors.
+    const real_t largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z)});
+    engine_axis = largest > real_t{0.0} ? (value / largest).normalized() : Vector3();
 }
 
 void Vehicle::set_throttle_input(real_t value) {
@@ -210,6 +286,12 @@ bool Vehicle::restart() {
     // Inertness is committed before any validation or setup work.  A failed
     // restart must never leave the previous runtime active.
     initialized = false;
+    stability_control.reset();
+    engine_reaction.reset();
+    engine_reaction_sample = EngineReactionSample();
+    engine_chassis_torque = Vector3();
+    handling_history_valid = false;
+    handling_sample = HandlingTelemetry();
     const Transform3D preserved_transform = get_global_transform();
     const Vector3 preserved_linear_velocity = get_linear_velocity();
     const Vector3 preserved_angular_velocity = get_angular_velocity();
@@ -260,6 +342,12 @@ VehicleTelemetrySnapshot Vehicle::get_telemetry_snapshot() const {
     const RotationalBody &drive_shaft = drivetrain.get_driveshaft();
 
     VehicleTelemetrySnapshot snapshot;
+    snapshot.engine_reaction = engine_reaction_sample;
+    snapshot.engine_chassis_torque = engine_chassis_torque;
+    snapshot.engine_generated_torque = engine.get_generated_torque();
+    snapshot.stability = stability_control.get_telemetry();
+    snapshot.handling = handling_sample;
+    snapshot.driver_steering = steer_input;
     snapshot.engine_rpm = engine.get_rpm();
     snapshot.engine_torque = engine.get_torque();
     snapshot.engine_throttle = throttle_input;

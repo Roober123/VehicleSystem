@@ -24,8 +24,7 @@ real_t VehicleEngine::get_torque() const {
 }
 
 void VehicleEngine::accumulate_torque(real_t dt) {
-
-
+	const real_t initial_pending_torque = get_pending_torque();
 	constexpr real_t ang_to_rpm = 60.0 / (2.0 * Math_PI);
 	real_t rpm = angular_velocity * ang_to_rpm;
 
@@ -55,6 +54,7 @@ void VehicleEngine::accumulate_torque(real_t dt) {
 	const real_t air_charge_ratio = turbo != nullptr ? turbo->get_air_charge_ratio() : real_t{1.0};
 	const real_t boosted_torque = curve_multiplier * max_torque * air_charge_ratio;
 	effective_drive_torque = boosted_torque * effective_throttle;
+	generated_torque = std::max(effective_drive_torque, real_t{0.0});
 	RotationalBody::add_torque(effective_drive_torque);
 
 	// Engine braking
@@ -71,13 +71,16 @@ void VehicleEngine::accumulate_torque(real_t dt) {
 		constexpr real_t rpm_to_ang = 2.0 * Math_PI / 60.0;
 		const real_t idle_feedforward = drag * idle_rpm * rpm_to_ang;
 		RotationalBody::add_torque(idle_feedforward);
+		generated_torque += idle_feedforward;
 	}
 
 	// Idle controller
 	if (rpm < idle_rpm) {
 		real_t idle_torque = max_torque * real_t{0.1} * (real_t{1.0} - rpm / idle_rpm);
 		RotationalBody::add_torque(idle_torque);
+		generated_torque += idle_torque;
 	}
+	self_torque = get_pending_torque() - initial_pending_torque - drag * angular_velocity;
 }
 
 void VehicleEngine::integrate(real_t dt) {

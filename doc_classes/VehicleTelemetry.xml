@@ -11,6 +11,14 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+        <method name="get_engine_reaction_telemetry" qualifiers="const">
+            <return type="Dictionary" />
+            <description>Reads the latest completed physics snapshot. Keys: generated_torque (Nm, last engine substep, including idle support); reaction_torque and vibration_torque (signed frame-average Nm along engine_axis); vibration_amplitude (frame-average Nm after speed fading and the torque cap); vibration_frequency (frame-average Hz after band limiting); speed_factor (frame-average speed fade multiplier, 0 to 1); chassis_torque (applied world-space Vector3 in Nm). A zero axis or disabled/missing resource reports zero reaction and vibration. Dictionary allocation occurs only on request.</description>
+        </method>
+        <method name="get_handling_telemetry" qualifiers="const">
+            <return type="Dictionary" />
+            <description>Completed physics snapshot: ESC yaw target/error (rad/s), raw requested and applied torque (Nm), cap/slew/support/speed gate flags; body-frame sideslip (rad), bounded filtered trend (rad/s), validity, yaw rate/acceleration, lateral acceleration; driver steering, rack target/actual (rad), raw/applied SAT (Nm). Sideslip trend is valid only for forward speed at least 3 m/s and resets across invalid history. Its derivative is bounded to 10 rad/s and filtered with a 0.1 s time constant. Diagnostic history does not affect ESC torque. Tire telemetry also includes current world wheel axes, final lateral/longitudinal forces and SAT. Dictionaries are constructed on request, outside the physics solver.</description>
+        </method>
 		<method name="set_target" qualifiers="">
 			<return type="void" />
 			<param index="0" name="vehicle" type="Vehicle" />

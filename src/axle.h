@@ -82,6 +82,7 @@ public:
 
     // Current steering angle in radians
     real_t get_steer_angle() const;
+    const SteeringRack &get_steering_rack() const { return steering_rack; }
 
     void set_trackwidth(real_t value) { trackwidth = value; }
     real_t get_trackwidth() const { return trackwidth; }

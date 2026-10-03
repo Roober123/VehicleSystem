@@ -9,7 +9,9 @@ drivetrain equations and solver invariants live in the
 `Vehicle` is the composition root and performs validated, one-shot setup.
 `VehicleRunningGear` owns axles, wheels, suspension, steering, tires, traction
 control, and aerodynamics. `VehicleDrivetrain` owns the engine, gearbox, clutch,
-driveshaft, rotational network, and optional turbo.
+driveshaft, rotational network, and optional turbo. `Vehicle` also owns the
+optional `VehicleStabilityControl`, configured by `ESCData`; aerodynamics
+contains only drag and downforce.
 
 The main production areas are:
 
@@ -36,7 +38,9 @@ Each `Vehicle` accepts one `VehicleConfig`. Setup requires:
 One through eight driven two-wheel axles are supported. Positive drive shares
 are normalized as flat axle weights; there is no inter-axle differential. Each
 axle independently selects an open, locked, or limited-slip left/right policy.
-Aerodynamics and turbo resources are optional.
+Aerodynamics, ESC, and turbo resources are optional. Missing `esc_data` or
+`ESCData.enabled == false` disables yaw-control torque. ESC parameters are
+copied during setup and restart, like the other subsystem resources.
 
 Setup reports all major missing-resource and composition errors together. An
 invalid vehicle remains inert, and its configuration cannot be replaced after
@@ -87,6 +91,23 @@ Schur-complement derivation, and validation boundaries are documented in the
 
 ## Engine and gearbox behavior
 
+`Vehicle` owns an optional `VehicleEngineReaction`, configured by
+`EngineReactionData` during setup/restart. The engine caches positive generated
+torque (combustion plus idle support) and signed self torque (including braking
+and drag) before clutch coupling. Reaction opposes self torque; sinusoidal
+vibration scales with generated torque. `Vehicle.engine_axis` defines normalized
+chassis-local crankshaft direction; zero disables the effect. Frequency is
+independent of vehicle speed; both reaction and vibration strength fade using
+smoothstep from 5 to 30 km/h by default, based on absolute body velocity.
+The fade thresholds are copied from the resource at setup/restart, and oscillator
+phase remains continuous while travelling torque is suppressed. Frequency is
+bounded by the chassis tick rate, and symmetric cap headroom preserves zero-mean
+vibration at constant load. Each substep analytically averages the oscillator
+and accumulates angular impulse; the vehicle applies one frame-average torque
+through direct body state. Restart clears phase and telemetry. This is an
+engine-block reaction approximation, with no elastic mounts or gearbox housing
+reaction model. `get_engine_reaction_telemetry()` exposes the completed sample.
+
 Gear changes are command based and support automatic and semi-automatic modes.
 The drivetrain solve receives the substep duration, signed gearbox ratio,
 clutch engagement, and clutch capacity directly.
@@ -99,7 +120,15 @@ throttle lift. A 110% redline ceiling remains as an emergency bound.
 
 ## Running gear, telemetry, and skid marks
 
-Each wheel combines suspension and tire forces with ABS and traction-control
+Frame phases apply suspension, aerodynamics, and ESC before drivetrain/tire
+substeps. ESC retains the bicycle-model yaw target, lateral-acceleration limit,
+yaw inertia estimate, torque ceiling, and two-grounded-wheel requirement.
+
+Each wheel constructs an orthonormal contact frame, filters instantaneous slip
+velocity and angle using contact forward speed, then generates and limits tire
+forces using the current load and grip. Slip telemetry stays instantaneous;
+transient states reset on contact loss. Brake hold shares the combined grip
+limit. Each wheel combines suspension and tire forces with ABS and traction-control
 inputs. Its runtime `grip_multiplier` supports surface-dependent or gameplay
 grip changes without replacing tire data.
 

@@ -1,0 +1,50 @@
+[
+	{
+		"final_beta_deg": -4.21561024633835,
+		"final_speed_mps": 24.0364742279053,
+		"full_tcs_cut_ticks": 0,
+		"initial_speed_mps": 24.0519046783447,
+		"max_beta_deg": 4.26394413419784,
+		"max_rear_lateral_force_step_n": 125.036499023438,
+		"max_rear_load_step_n": 49.476806640625,
+		"max_rear_slip": 0.0332709364593029,
+		"max_yaw_accel": 1.55219703912735,
+		"max_yaw_rate": 0.349946767091751,
+		"min_grounded": 4,
+		"phase": "power_corner",
+		"ticks": 240,
+		"variant": "awd_baseline"
+	},
+	{
+		"final_beta_deg": 14.9325319037624,
+		"final_speed_mps": 22.5756168365479,
+		"full_tcs_cut_ticks": 0,
+		"initial_speed_mps": 24.0364742279053,
+		"max_beta_deg": 14.9325319037624,
+		"max_rear_lateral_force_step_n": 559.304412841797,
+		"max_rear_load_step_n": 15.798828125,
+		"max_rear_slip": 0.00959147047251463,
+		"max_yaw_accel": 5.38829237222672,
+		"max_yaw_rate": 0.877716660499573,
+		"min_grounded": 4,
+		"phase": "countersteer",
+		"ticks": 120,
+		"variant": "awd_baseline"
+	},
+	{
+		"final_beta_deg": -0.0262273408186945,
+		"final_speed_mps": 24.0444641113281,
+		"full_tcs_cut_ticks": 0,
+		"initial_speed_mps": 22.5756168365479,
+		"max_beta_deg": 16.2064080986253,
+		"max_rear_lateral_force_step_n": 315.11962890625,
+		"max_rear_load_step_n": 33.589599609375,
+		"max_rear_slip": 0.0334238559007645,
+		"max_yaw_accel": 1.63797497749329,
+		"max_yaw_rate": 0.566727697849274,
+		"min_grounded": 4,
+		"phase": "recovery",
+		"ticks": 240,
+		"variant": "awd_baseline"
+	}
+]

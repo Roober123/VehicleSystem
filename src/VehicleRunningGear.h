@@ -47,10 +47,7 @@ public:
                            const Vector3 &angular_velocity);
 
     void apply_aerodynamics(RigidBody3D *vehicle,
-                            const Basis &body_basis,
                             const Vector3 &linear_velocity,
-                            const Vector3 &angular_velocity,
-                            real_t vehicle_mass,
                             const Vector3 &body_origin);
 
     void solve_steering_and_tires(const Vector3 &com_global,

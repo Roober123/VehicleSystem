@@ -31,7 +31,7 @@
 		</method>
 		<method name="get_slip_ratio" qualifiers="const">
 			<return type="float" />
-			<description>Returns the current longitudinal slip ratio.</description>
+			<description>Returns the instantaneous longitudinal slip ratio: (wheel tread speed - contact forward speed) / sqrt(contact forward speed squared + 9). The smooth 3 m/s regularization keeps the ratio finite near rest. This same normalization is used for longitudinal tire force and ABS.</description>
 		</method>
 		<method name="get_slip_angle" qualifiers="const">
 			<return type="float" />

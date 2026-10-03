@@ -1193,6 +1193,231 @@ void test_turbo(TestState &state) {
                  "VehicleEngine naturally aspirated path remains baseline");
 }
 
+void test_engine_reaction(TestState &state) {
+    constexpr real_t dt = real_t{1.0} / real_t{120.0};
+    Ref<VehicleEngineData> engine_data = make_engine_data();
+    VehicleEngine engine(engine_data);
+    engine.accumulate_torque(dt);
+    const real_t idle_generated = engine_data->get_engine_drag() * rpm_to_omega(engine_data->get_idle_rpm());
+    state.expect(near(engine.get_generated_torque(), idle_generated) && idle_generated > real_t{0.0},
+            "Idle vibration uses generated torque that balances rotational drag");
+    state.expect(near(engine.get_self_torque(), real_t{0.0}) && near(engine.get_torque(), real_t{0.0}),
+            "Idle generated torque is separate from net and throttle drive torque");
+    engine.integrate(dt);
+    engine.set_angular_velocity(rpm_to_omega(real_t{500.0}));
+    engine.accumulate_torque(dt);
+    state.expect(engine.get_generated_torque() > idle_generated && engine.get_self_torque() > real_t{0.0},
+            "Idle recovery controller increases generated and reaction torque");
+    engine.integrate(dt);
+    engine.set_angular_velocity(rpm_to_omega(real_t{2000.0}));
+    engine.throttle = real_t{1.0};
+    engine.accumulate_torque(dt);
+    const real_t full_load_self = engine.get_self_torque();
+    state.expect(near(engine.get_generated_torque(), real_t{100.0}),
+            "Generated vibration source follows actual engine drive torque");
+    engine.add_torque(-full_load_self);
+    state.expect(near(engine.get_effective_torque(), real_t{0.0}) &&
+            near(engine.get_self_torque(), full_load_self),
+            "Clutch balancing steady load does not erase cached engine-block reaction");
+    engine.integrate(dt);
+    engine.throttle = real_t{0.0};
+    engine.accumulate_torque(dt);
+    state.expect(near(engine.get_generated_torque(), real_t{0.0}) && engine.get_self_torque() < real_t{0.0},
+            "Closed-throttle engine braking reverses reaction without combustion vibration");
+    engine.integrate(dt);
+    engine.set_angular_velocity(rpm_to_omega(engine_data->get_redline_rpm()));
+    engine.throttle = real_t{1.0};
+    engine.accumulate_torque(dt);
+    state.expect(near(engine.get_generated_torque(), real_t{0.0}),
+            "Limiter cuts generated torque used for vibration");
+
+    Ref<EngineReactionData> data = memnew(EngineReactionData);
+    data->set_reaction_strength(real_t{0.5});
+    data->set_vibration_strength(real_t{0.25});
+    // Isolate the original torque/fade tests from the extra idle boost below.
+    data->set_idle_vibration_multiplier(real_t{1.0});
+    data->set_idle_vibration_frequency(real_t{5.0});
+    data->set_redline_vibration_frequency(real_t{20.0});
+    data->set_maximum_torque(real_t{1000.0});
+    VehicleEngineReaction reaction;
+    reaction.configure(data);
+    const auto idle = reaction.update(idle_generated, real_t{0.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    state.expect(near(idle.vibration_amplitude, idle_generated * real_t{0.25}) && idle.vibration_torque > real_t{0.0},
+            "Stable idle still creates torque-proportional vibration");
+    reaction.reset();
+    const auto restarted_idle = reaction.update(idle_generated, real_t{0.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    state.expect(near(restarted_idle.vibration_torque, idle.vibration_torque),
+            "Restart resets vibration phase deterministically");
+
+    Ref<EngineReactionData> idle_boost_data = memnew(EngineReactionData);
+    idle_boost_data->set_vibration_strength(real_t{0.25});
+    VehicleEngineReaction idle_boost;
+    auto boosted_at = [&](real_t rpm, real_t speed = real_t{0.0}) {
+        idle_boost.configure(idle_boost_data);
+        return idle_boost.update(real_t{100.0}, real_t{40.0}, rpm,
+                real_t{850.0}, real_t{4000.0}, dt, dt, speed);
+    };
+    for (real_t rpm : {real_t{800.0}, real_t{850.0}, real_t{950.0}, real_t{1000.0}}) {
+        const auto boosted = boosted_at(rpm);
+        state.expect(near(boosted.vibration_amplitude, real_t{37.5}) && near(boosted.reaction_torque, real_t{-10.0}),
+                "Idle and recovery up through 1000 RPM receive 1.5x vibration without changing reaction");
+    }
+    state.expect(near(boosted_at(real_t{1001.0}).vibration_amplitude, real_t{25.0}),
+            "Vibration returns to normal strength above the idle RPM threshold");
+    state.expect(near(boosted_at(real_t{950.0}, real_t{30.0}).total_torque(), real_t{0.0}),
+            "Idle vibration boost still obeys travel speed fading");
+    idle_boost_data->set_idle_vibration_max_rpm(real_t{1200.0});
+    idle_boost_data->set_idle_vibration_multiplier(real_t{2.0});
+    state.expect(near(boosted_at(real_t{1100.0}).vibration_amplitude, real_t{50.0}),
+            "Exported idle threshold and multiplier tune the boost range and strength");
+    idle_boost_data->set_maximum_torque(real_t{20.0});
+    state.expect(near(boosted_at(real_t{1100.0}).vibration_amplitude, real_t{10.0}),
+            "Idle vibration multiplier cannot exceed symmetric torque cap headroom");
+
+    auto at_speed = [&](real_t speed) {
+        reaction.configure(data);
+        return reaction.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+                real_t{1000.0}, real_t{4000.0}, dt, dt, speed);
+    };
+    const auto parked = at_speed(real_t{0.0});
+    const auto crawling = at_speed(real_t{5.0});
+    const auto midway = at_speed(real_t{17.5});
+    const auto reverse_midway = at_speed(real_t{-17.5});
+    const auto travelling = at_speed(real_t{30.0});
+    const auto fast_reverse = at_speed(real_t{-100.0});
+    state.expect(near(parked.speed_factor, real_t{1.0}) && near(crawling.total_torque(), parked.total_torque()),
+            "Parked and crawling vehicles retain full engine effect");
+    state.expect(near(midway.speed_factor, real_t{0.5}) &&
+            near(midway.reaction_torque, parked.reaction_torque * real_t{0.5}) &&
+            near(midway.vibration_amplitude, parked.vibration_amplitude * real_t{0.5}) &&
+            near(midway.vibration_torque, parked.vibration_torque * real_t{0.5}),
+            "Speed fade reduces both steady reaction and vibration smoothly");
+    state.expect(near(midway.total_torque(), reverse_midway.total_torque()) &&
+            near(fast_reverse.total_torque(), real_t{0.0}),
+            "Speed fade protects forward and reverse travel equally");
+    state.expect(near(travelling.speed_factor, real_t{0.0}) && near(travelling.total_torque(), real_t{0.0}) &&
+            near(travelling.vibration_amplitude, real_t{0.0}),
+            "No engine chassis torque remains at or above the fade end speed");
+    state.expect(near(midway.vibration_frequency, parked.vibration_frequency),
+            "Travel fade changes strength without lowering RPM-driven oscillator frequency");
+    real_t previous_factor = real_t{1.0};
+    for (int speed = 0; speed <= 40; ++speed) {
+        const auto sample = at_speed(static_cast<real_t>(speed));
+        state.expect(sample.speed_factor <= previous_factor && sample.speed_factor >= real_t{0.0},
+                "Engine speed fade is bounded and monotonically decreasing");
+        previous_factor = sample.speed_factor;
+    }
+    VehicleEngineReaction continuous;
+    reaction.configure(data);
+    continuous.configure(data);
+    reaction.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt, real_t{100.0});
+    continuous.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    const auto resumed = reaction.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    const auto uninterrupted = continuous.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    state.expect(near(resumed.vibration_torque, uninterrupted.vibration_torque),
+            "Oscillator phase remains continuous while the effect fades out at speed");
+    data->set_speed_fade_start_kph(real_t{0.0});
+    data->set_speed_fade_end_kph(real_t{10.0});
+    const auto copied_settings = reaction.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt, real_t{17.5});
+    state.expect(near(copied_settings.speed_factor, real_t{0.5}) && near(at_speed(real_t{17.5}).speed_factor, real_t{0.0}),
+            "Speed fade settings are copied during configure and refreshed on restart");
+    data->set_speed_fade_start_kph(real_t{10.0});
+    data->set_speed_fade_end_kph(real_t{5.0});
+    state.expect(near(at_speed(real_t{10.5}).speed_factor, real_t{0.5}) &&
+            near(at_speed(real_t{11.0}).total_torque(), real_t{0.0}),
+            "Invalid fade ordering still produces a finite one-kph transition");
+    data->set_speed_fade_start_kph(real_t{5.0});
+    data->set_speed_fade_end_kph(real_t{30.0});
+
+    for (int count : {1, 8, 64}) {
+        VehicleEngineReaction single, subdivided;
+        single.configure(data);
+        subdivided.configure(data);
+        for (int tick = 0; tick < 120; ++tick) {
+            const auto whole = single.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+                    real_t{1000.0}, real_t{4000.0}, dt, dt);
+            real_t average = 0.0;
+            for (int step = 0; step < count; ++step) {
+                const auto part = subdivided.update(real_t{100.0}, real_t{40.0}, real_t{2000.0},
+                        real_t{1000.0}, real_t{4000.0}, dt / count, dt);
+                average += part.total_torque() / count;
+            }
+            state.expect(near(average, whole.total_torque(), real_t{2e-3}),
+                    "Constant-source torque is independent of drivetrain substep count");
+            state.expect(near(whole.reaction_torque, real_t{-20.0}),
+                    "Engine-block reaction opposes positive engine self torque");
+        }
+    }
+
+    data->set_reaction_strength(real_t{0.0});
+    reaction.configure(data);
+    real_t vibration_sum = 0.0;
+    for (int tick = 0; tick < 120; ++tick)
+        vibration_sum += reaction.update(real_t{100.0}, real_t{40.0}, real_t{1000.0},
+                real_t{1000.0}, real_t{4000.0}, dt, dt).vibration_torque * dt;
+    state.expect(near(vibration_sum, real_t{0.0}, real_t{1e-4}),
+            "Vibration has zero angular impulse over complete cycles");
+
+    // Descending RPM can pause an already-moving oscillator at nonzero phase.
+    data->set_idle_vibration_frequency(real_t{0.0});
+    reaction.configure(data);
+    reaction.update(real_t{100.0}, real_t{0.0}, real_t{4000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    const auto paused = reaction.update(real_t{100.0}, real_t{0.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    state.expect(near(paused.vibration_torque, real_t{0.0}) && near(paused.vibration_amplitude, real_t{0.0}),
+            "Zero frequency suppresses vibration rather than freezing a nonzero torque");
+
+    data->set_reaction_strength(real_t{0.5});
+    data->set_maximum_torque(real_t{25.0});
+    data->set_idle_vibration_frequency(real_t{10000.0});
+    reaction.configure(data);
+    const auto capped = reaction.update(real_t{1000.0}, real_t{40.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt);
+    state.expect(near(capped.vibration_amplitude, real_t{5.0}) && std::abs(capped.total_torque()) <= real_t{25.0},
+            "Vibration stays within symmetric headroom under the total torque cap");
+    reaction.configure(data);
+    const auto capped_midway = reaction.update(real_t{1000.0}, real_t{40.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt, real_t{17.5});
+    state.expect(near(capped_midway.vibration_amplitude, real_t{2.5}) &&
+            near(capped_midway.total_torque(), capped.total_torque() * real_t{0.5}),
+            "Speed fade also reduces saturated vibration without releasing extra cap headroom");
+    state.expect(capped.vibration_frequency <= real_t{0.2} / dt,
+            "Vibration is band-limited using chassis tick duration rather than drivetrain substeps");
+    state.expect(near(reaction.update(real_t{100.0}, real_t{40.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, real_t{0.0}, dt).total_torque(), real_t{0.0}),
+            "Invalid reaction timestep produces no torque");
+    data->set_enabled(false);
+    reaction.configure(data);
+    state.expect(near(reaction.update(real_t{100.0}, real_t{40.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt).total_torque(), real_t{0.0}),
+            "Disabled reaction resource produces no torque");
+    reaction.configure(Ref<EngineReactionData>());
+    state.expect(near(reaction.update(real_t{100.0}, real_t{40.0}, real_t{1000.0},
+            real_t{1000.0}, real_t{4000.0}, dt, dt).total_torque(), real_t{0.0}),
+            "Missing reaction resource preserves old vehicle behavior");
+
+    Vehicle *vehicle = memnew(Vehicle);
+    vehicle->set_engine_axis(Vector3(10.0, 0.0, 0.0));
+    state.expect(vehicle->get_engine_axis().is_equal_approx(Vector3(1.0, 0.0, 0.0)),
+            "Engine axis is chassis-local and normalized without scaling strength");
+    vehicle->set_engine_axis(Vector3(-10.0, 0.0, 0.0));
+    state.expect(vehicle->get_engine_axis().is_equal_approx(Vector3(-1.0, 0.0, 0.0)),
+            "Reversing axis selects opposite engine rotation");
+    vehicle->set_engine_axis(Vector3(std::numeric_limits<real_t>::quiet_NaN(), 0.0, 0.0));
+    state.expect(vehicle->get_engine_axis().is_finite(), "Nonfinite axis is ignored");
+    vehicle->set_engine_axis(Vector3());
+    state.expect(vehicle->get_engine_axis().is_zero_approx(), "Zero axis disables chassis torque");
+    memdelete(vehicle);
+}
+
 void test_engine(TestState &state) {
     VehicleEngine idle_engine(make_engine_data());
     const real_t idle_omega = rpm_to_omega(idle_engine.get_idle_rpm());
@@ -1358,6 +1583,313 @@ void test_tire_combined_grip(TestState &state) {
     memdelete(full_grip);
     memdelete(half_grip);
     memdelete(zero_grip);
+}
+
+void test_longitudinal_slip_curve(TestState &state) {
+    Ref<TireData> tire = make_grip_tire(real_t{2.0});
+    Ref<Curve> curve = memnew(Curve);
+    curve->set_max_domain(real_t{2.0});
+    curve->add_point(Vector2(0.0, 0.0), real_t{0.0}, real_t{2.0});
+    curve->add_point(Vector2(1.0, 1.0));
+    curve->add_point(Vector2(2.0, 0.8));
+    tire->set_forward_friction_curve(curve);
+    tire->set_lateral_friction_curve(Ref<Curve>());
+    tire->set_force_response_low_speed_ms(real_t{0.0});
+    tire->set_force_response_108_kph_ms(real_t{0.0});
+    state.expect(near(tire->get_peak_slip_ratio(), real_t{0.15}), "Longitudinal peak defaults to 15 percent slip");
+
+    // Equal normalized slip must produce equal force in launches, forward travel,
+    // and reverse. Negative slip exercises braking as well as wheelspin.
+    for (real_t speed : {real_t{0.0}, real_t{0.01}, real_t{-0.01}, real_t{10.0}, real_t{30.0}, real_t{-30.0}}) {
+        Wheel *wheel = make_combined_grip_wheel(tire);
+        for (real_t normalized_slip : {real_t{0.0}, real_t{0.5}, real_t{1.0}, real_t{2.0}, real_t{10.0}, real_t{-2.0}}) {
+            const real_t slip_velocity = normalized_slip * real_t{0.15} * std::hypot(speed, real_t{3.0});
+            wheel->get_rotational_body_for_setup()->set_angular_velocity((speed + slip_velocity) / tire->get_radius());
+            wheel->tire_force = Vector3();
+            wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, speed), Vector3(), real_t{0.01}, real_t{0.0}, false);
+            const real_t expected_force = normalized_slip == real_t{0.0} ? real_t{0.0}
+                : normalized_slip == real_t{0.5} ? real_t{7.5}
+                : normalized_slip == real_t{1.0} ? real_t{10.0}
+                : normalized_slip < real_t{0.0} ? real_t{-8.0} : real_t{8.0};
+            state.expect(near(wheel->tire_force.z, expected_force, real_t{3e-4}) &&
+                             near(wheel->get_slip_ratio(), normalized_slip * real_t{0.15}),
+                         "Editable slip-ratio curve preserves its peak, falloff, sign, and zero force across road speeds");
+        }
+        memdelete(wheel);
+    }
+
+    // Moving the authored slip scale moves the force peak and ABS target together.
+    tire->set_peak_slip_ratio(real_t{0.3});
+    Wheel *wheel = make_combined_grip_wheel(tire);
+    wheel->get_rotational_body_for_setup()->set_angular_velocity(
+        (real_t{10.0} + real_t{0.15} * std::hypot(real_t{10.0}, real_t{3.0})) / tire->get_radius());
+    wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, 10.0), Vector3(), real_t{0.01}, real_t{0.0}, false);
+    state.expect(near(wheel->tire_force.z, real_t{7.5}), "Authored peak slip ratio rescales the editable curve");
+    wheel->slip_ratio = real_t{0.2};
+    wheel->_apply_abs(real_t{1.0}, real_t{10.0}, real_t{0.01});
+    state.expect(!wheel->get_abs_active(), "ABS does not release below the authored peak slip ratio");
+    wheel->slip_ratio = real_t{0.4};
+    wheel->_apply_abs(real_t{1.0}, real_t{10.0}, real_t{0.01});
+    state.expect(wheel->get_abs_active(), "ABS releases above the authored peak slip ratio");
+    memdelete(wheel);
+    tire->set_peak_slip_ratio(real_t{0.0});
+    state.expect(near(tire->get_peak_slip_ratio(), real_t{0.01}), "Peak slip ratio cannot introduce division by zero");
+    tire->set_peak_slip_ratio(std::numeric_limits<real_t>::quiet_NaN());
+    state.expect(near(tire->get_peak_slip_ratio(), real_t{0.15}), "Nonfinite peak slip ratio resets to its default");
+}
+
+void test_contact_basis(TestState &state) {
+    Ref<TireData> tire = make_grip_tire(real_t{2.0});
+    tire->set_forward_friction_curve(Ref<Curve>());
+    tire->set_lateral_friction_curve(Ref<Curve>());
+    tire->set_force_response_low_speed_ms(real_t{0.0});
+    tire->set_force_response_108_kph_ms(real_t{0.0});
+    const Vector3 original_right(1.0, 0.0, 0.0);
+    for (const Vector3 &normal : {Vector3(0.0, 1.0, 0.0),
+                                  Vector3(0.3, 1.0, 0.0),
+                                  Vector3(0.0, 1.0, 0.4),
+                                  Vector3(0.3, 1.0, 0.4),
+                                  Vector3(0.0, 0.0, 1.0),
+                                  Vector3(0.0, 1e-6, 1.0)}) {
+        Wheel *wheel = make_combined_grip_wheel(tire);
+        wheel->collision_normal = normal;
+        wheel->get_rotational_body_for_setup()->set_angular_velocity(real_t{10.0});
+        wheel->solve_tire(Vector3(), Vector3(), Vector3(), real_t{0.01}, real_t{0.0}, false);
+        // Observe the contact axes through pure longitudinal/lateral forces;
+        // this also checks that the solver actually consumes the corrected frame.
+        const Vector3 forward = wheel->tire_force.normalized();
+        const Vector3 expected_right = normal.normalized().cross(forward).normalized();
+        wheel->get_rotational_body_for_setup()->set_angular_velocity(real_t{0.0});
+        wheel->tire_force = Vector3();
+        wheel->solve_tire(Vector3(), expected_right * real_t{4.0}, Vector3(),
+                         real_t{0.01}, real_t{0.0}, false);
+        const Vector3 right = -wheel->tire_force.normalized();
+        state.expect(near(forward.length(), real_t{1.0}) && near(right.length(), real_t{1.0}) &&
+                         near(forward.dot(normal.normalized()), real_t{0.0}) &&
+                         near(right.dot(normal.normalized()), real_t{0.0}) &&
+                         near(forward.dot(right), real_t{0.0}) && right.dot(original_right) > real_t{0.0} &&
+                         near(wheel->get_slip_ratio(), real_t{0.0}),
+                     "Contact frame is orthonormal and preserves right handedness on slopes and fallback contacts");
+        memdelete(wheel);
+    }
+
+    Wheel *wheel = make_combined_grip_wheel(tire);
+    wheel->set_basis(Basis(-original_right, Vector3(0.0, 1.0, 0.0), Vector3(0.0, 0.0, 1.0)));
+    wheel->get_rotational_body_for_setup()->set_angular_velocity(real_t{10.0});
+    wheel->solve_tire(Vector3(), Vector3(), Vector3(), real_t{0.01}, real_t{0.0}, false);
+    state.expect(wheel->tire_force.z < real_t{0.0}, "Contact frame preserves mirrored wheel handedness");
+    for (const Vector3 &normal : {Vector3(), Vector3(std::numeric_limits<real_t>::quiet_NaN(), 1.0, 0.0)}) {
+        wheel->collision_normal = normal;
+        wheel->tire_force = Vector3();
+        wheel->solve_tire(Vector3(), Vector3(1.0, 0.0, 3.0), Vector3(), real_t{0.01}, real_t{0.0}, false);
+        state.expect(wheel->tire_force.is_finite() && wheel->tire_force == Vector3(),
+                     "Invalid contact normals abort without applying tire force");
+    }
+    wheel->collision_normal = Vector3(0.0, 1.0, 0.0);
+    wheel->set_basis(Basis(wheel->collision_normal, wheel->collision_normal, wheel->collision_normal));
+    wheel->solve_tire(Vector3(), Vector3(), Vector3(), real_t{0.01}, real_t{0.0}, false);
+    state.expect(wheel->tire_force == Vector3(), "Fully degenerate contact directions safely abort");
+    memdelete(wheel);
+}
+
+void test_tire_transients(TestState &state) {
+    for (real_t exponent : {real_t{2.0}, real_t{4.0}}) {
+        Ref<TireData> tire = make_grip_tire(exponent);
+        tire->set_forward_friction_curve(Ref<Curve>());
+        tire->set_lateral_friction_curve(Ref<Curve>());
+        tire->set_friction_forward(real_t{1.1});
+        tire->set_friction_lateral(real_t{0.8});
+        tire->set_load_grip_loss_percent(real_t{10.0});
+        tire->set_force_response_low_speed_ms(real_t{60.0});
+        tire->set_force_response_108_kph_ms(real_t{15.0});
+        for (int rate : {60, 120, 240}) {
+            for (int substeps : {1, 2, 8}) {
+                Wheel *wheel = make_combined_grip_wheel(tire);
+                const real_t dt = real_t{1.0} / static_cast<real_t>(rate * substeps);
+                const real_t tau = real_t{0.045}; // 10 m/s contact forward speed.
+                real_t expected_velocity = 0.0;
+                real_t expected_angle = 0.0;
+                struct Phase { real_t slip_velocity; real_t angle; real_t load; bool grounded; };
+                const Phase phases[] = {
+                    {0.0, 0.0, 10.0, true}, // straight rolling
+                    {6.0, 0.0, 10.0, true}, // throttle application
+                    {0.0, 0.0, 10.0, true}, // throttle release
+                    {0.0, 0.2, 10.0, true}, // sudden steering
+                    {0.0, -0.2, 10.0, true}, // steering reversal
+                    {6.0, 0.2, 10.0, true}, // combined acceleration/cornering
+                    {6.0, 0.2, 1.0, true}, // abrupt unloading
+                    {6.0, 0.2, 0.0, false}, // airborne
+                    {6.0, 0.2, 10.0, true}, // touchdown
+                };
+                for (const Phase &phase : phases) {
+                    wheel->on_ground = phase.grounded;
+                    wheel->set_normal_force(phase.load);
+                    wheel->get_rotational_body_for_setup()->set_angular_velocity(
+                        (real_t{10.0} + phase.slip_velocity) / tire->get_radius());
+                    const real_t initial_velocity = expected_velocity;
+                    const real_t initial_angle = expected_angle;
+                    for (int step = 0; step < rate / 10 * substeps; ++step) {
+                        wheel->tire_force = Vector3();
+                        wheel->solve_tire(Vector3(), Vector3(std::tan(phase.angle) * real_t{12.5}, 0.0, 10.0),
+                                         Vector3(), dt, real_t{0.0}, false);
+                        if (!phase.grounded) {
+                            state.expect(wheel->tire_force == Vector3(), "Airborne tire produces no force");
+                            continue;
+                        }
+                        const real_t capacity = phase.load * wheel->_get_load_sensitivity_scale(phase.load);
+                        const real_t utilization = std::pow(std::abs(wheel->tire_force.z) / (capacity * real_t{1.1}), exponent) +
+                                                   std::pow(std::abs(wheel->tire_force.x) / (capacity * real_t{0.8}), exponent);
+                        state.expect(wheel->tire_force.is_finite() && utilization <= real_t{1.00001},
+                                     "Transient force always respects current load-sensitive combined grip capacity");
+                    }
+                    const real_t decay = std::exp(-real_t{0.1} / tau);
+                    expected_velocity = phase.grounded ? phase.slip_velocity + (initial_velocity - phase.slip_velocity) * decay : real_t{0.0};
+                    expected_angle = phase.grounded ? phase.angle + (initial_angle - phase.angle) * decay : real_t{0.0};
+                    state.expect(near(wheel->relaxed_slip_velocity, expected_velocity) &&
+                                     near(wheel->relaxed_slip_angle, expected_angle),
+                                 "Slip transients and touchdown match analytical response across physics rates and substeps");
+                    if (phase.grounded)
+                        state.expect(near(wheel->get_slip_ratio(), phase.slip_velocity / std::hypot(real_t{10.0}, real_t{3.0})) &&
+                                         near(wheel->get_slip_angle(), phase.angle * real_t{180.0} / kPi),
+                                     "Slip telemetry remains instantaneous during tire relaxation");
+                }
+                memdelete(wheel);
+            }
+        }
+    }
+
+    Ref<TireData> tire = make_grip_tire(real_t{2.0});
+    tire->set_forward_friction_curve(Ref<Curve>());
+    tire->set_lateral_friction_curve(Ref<Curve>());
+    tire->set_force_response_low_speed_ms(real_t{60.0});
+    tire->set_force_response_108_kph_ms(real_t{15.0});
+    Wheel *wheel = make_combined_grip_wheel(tire);
+    wheel->collision_point = Vector3(1.0, 0.0, 0.0);
+    // Contact forward speed is 3 m/s despite large lateral/vertical COM speed.
+    wheel->solve_tire(Vector3(), Vector3(40.0, 20.0, 5.0), Vector3(0.0, 2.0, 0.0),
+                     real_t{0.01}, real_t{0.0}, false);
+    state.expect(near(wheel->relaxed_slip_velocity, -real_t{3.0} * -std::expm1(-real_t{0.01} / real_t{0.0555})),
+                 "Relaxation speed uses contact-point longitudinal velocity including chassis rotation");
+    wheel->set_grip_multiplier(real_t{0.1});
+    wheel->tire_force = Vector3();
+    wheel->solve_tire(Vector3(), Vector3(3.0, 0.0, 3.0), Vector3(), real_t{0.01}, real_t{1.0}, false);
+    state.expect(wheel->tire_force.length() <= real_t{1.00001},
+                 "Reduced surface grip limits transient tire force and brake hold together");
+    wheel->integrate_rotation(real_t{0.01});
+    state.expect(near(wheel->get_angular_velocity(), real_t{0.0}),
+                 "Brakes keep a locked wheel stationary after tire reaction torque");
+    wheel->set_grip_multiplier(real_t{0.0});
+    wheel->tire_force = Vector3();
+    wheel->solve_tire(Vector3(), Vector3(3.0, 0.0, 3.0), Vector3(), real_t{0.01}, real_t{1.0}, false);
+    state.expect(wheel->tire_force == Vector3(), "Zero surface grip also disables braking hold force");
+    wheel->set_normal_force(real_t{0.0});
+    wheel->solve_tire(Vector3(), Vector3(3.0, 0.0, 3.0), Vector3(), real_t{0.01}, real_t{0.0}, false);
+    state.expect(near(wheel->relaxed_slip_velocity, real_t{0.0}) &&
+                     near(wheel->relaxed_slip_angle, real_t{0.0}) && wheel->tire_force == Vector3(),
+                 "An unloaded grounded contact clears transient state and generates no force");
+    memdelete(wheel);
+}
+
+void test_stability_control(TestState &state) {
+    VehicleStabilityControl esc;
+    StabilityState sample;
+    sample.vehicle_mass = real_t{1200.0};
+    sample.wheelbase = real_t{2.5};
+    sample.trackwidth = real_t{1.6};
+    sample.grounded_wheels = 4;
+    sample.linear_velocity = Vector3(0.0, 0.0, 20.0);
+    sample.angular_velocity = Vector3(0.0, 0.3, 0.0);
+    state.expect(esc.compute_torque(sample) == Vector3(), "ESC defaults to fully disabled without a resource");
+    Ref<ESCData> data = memnew(ESCData);
+    esc.load_parameters(data);
+    data->set_torque_smoothing_enabled(false);
+    // Reference is the previous aerodynamic yaw controller, frozen here to
+    // distinguish an extraction from a future controller tuning change.
+    const auto old_yaw_controller = [&](const StabilityState &s) {
+        const real_t speed = s.body_basis.xform_inv(s.linear_velocity).z;
+        if (s.wheelbase <= real_t{0.01} || s.grounded_wheels < 2 || std::abs(speed) < real_t{3.0})
+            return Vector3();
+        const real_t limit = real_t{9.81} / std::max(std::abs(speed), real_t{1.0});
+        const real_t desired = std::clamp(speed / s.wheelbase * std::tan(s.steer_angle), -limit, limit);
+        const real_t error = s.body_basis.xform_inv(s.angular_velocity).y - desired;
+        const real_t inertia = s.vehicle_mass * (s.wheelbase * s.wheelbase + s.trackwidth * s.trackwidth) / real_t{12.0};
+        return s.body_basis.get_column(1) * std::clamp(-inertia * real_t{2.0} * error, real_t{-6000.0}, real_t{6000.0});
+    };
+    for (real_t speed : {real_t{0.0}, real_t{2.0}, real_t{3.0}, real_t{20.0}, real_t{60.0}, real_t{-20.0}}) {
+        for (real_t steer : {real_t{0.0}, real_t{0.2}, real_t{-0.2}, real_t{0.6}}) {
+            for (real_t yaw : {real_t{0.0}, real_t{0.3}, real_t{-0.8}, real_t{10.0}}) {
+                for (int grounded : {0, 1, 2, 4}) {
+                    sample.body_basis = Basis(Vector3(1.0, 0.0, 0.0), real_t{0.2});
+                    sample.linear_velocity = sample.body_basis.xform(Vector3(5.0, 0.0, speed));
+                    sample.angular_velocity = sample.body_basis.xform(Vector3(0.0, yaw, 0.0));
+                    sample.steer_angle = steer;
+                    sample.grounded_wheels = grounded;
+                    const Vector3 torque = esc.compute_torque(sample);
+                    state.expect(torque.distance_to(old_yaw_controller(sample)) < real_t{0.001} &&
+                                     torque.length() <= real_t{6000.001},
+                                 "ESC matches old controller across straight/corner/slide/reversal/high-speed/grounding states");
+                    state.expect(esc.update(sample, real_t{1.0} / real_t{120.0}).is_equal_approx(old_yaw_controller(sample)),
+                                 "ESC output matches original equation with smoothing disabled");
+                }
+            }
+        }
+    }
+    sample.body_basis = Basis();
+    sample.linear_velocity = Vector3(0.0, 0.0, 20.0);
+    sample.grounded_wheels = 4;
+    // Use a gentle corner below the target lateral-acceleration ceiling.
+    sample.steer_angle = real_t{0.02};
+    sample.angular_velocity.y = real_t{20.0} / real_t{2.5} * std::tan(sample.steer_angle);
+    state.expect(esc.compute_torque(sample).length() < real_t{0.001}, "ESC leaves a matching steady corner uncorrected");
+    sample.angular_velocity.y = real_t{10.0};
+    data->set_maximum_corrective_torque(real_t{123.0});
+    esc.load_parameters(data);
+    state.expect(near(esc.compute_torque(sample).y, real_t{-123.0}), "ESC honors custom corrective torque ceiling");
+    data->set_yaw_damping(real_t{0.0});
+    esc.load_parameters(data);
+    state.expect(esc.compute_torque(sample) == Vector3(), "Zero ESC feedback gain produces no correction");
+    data->set_yaw_damping(real_t{2.0});
+    data->set_minimum_speed(real_t{30.0});
+    esc.load_parameters(data);
+    state.expect(esc.compute_torque(sample) == Vector3(), "ESC honors custom minimum speed");
+    data->set_minimum_speed(real_t{3.0});
+    data->set_enabled(false);
+    esc.load_parameters(data);
+    state.expect(esc.compute_torque(sample) == Vector3(), "ESC enabled=false applies exactly zero correction");
+    data->set_enabled(true);
+    esc.load_parameters(data);
+    esc.load_parameters(Ref<ESCData>());
+    state.expect(esc.compute_torque(sample) == Vector3(), "Removing ESC data disables a previously enabled controller");
+
+    Axle *front = make_axle(real_t{1.0});
+    Axle *rear = make_axle(real_t{0.0});
+    front->set_wheelbase(real_t{2.5});
+    rear->set_wheelbase(real_t{2.5});
+    front->set_trackwidth(real_t{1.5});
+    rear->set_trackwidth(real_t{1.7});
+    front->set_steerable(true);
+    Ref<SteeringRackData> rack = memnew(SteeringRackData);
+    front->set_steering_rack_data(rack);
+    front->reapply_resources();
+    front->solve_steering(real_t{0.4}, real_t{0.1}, real_t{0.0});
+    front->get_wheels()[0]->on_ground = true;
+    rear->get_wheels()[0]->on_ground = true;
+    const StabilityState gathered = esc.get_state(Basis().scaled(Vector3(2.0, 2.0, 2.0)),
+        sample.linear_velocity, sample.angular_velocity, sample.vehicle_mass, {front, rear});
+    state.expect(gathered.grounded_wheels == 2 && near(gathered.wheelbase, real_t{2.5}) &&
+                     near(gathered.trackwidth, real_t{1.6}) &&
+                     near(gathered.steer_angle, front->get_steer_angle()) &&
+                     near(gathered.body_basis.get_column(1).length(), real_t{1.0}) &&
+                     gathered.linear_velocity == sample.linear_velocity &&
+                     gathered.angular_velocity == sample.angular_velocity && near(gathered.vehicle_mass, sample.vehicle_mass),
+                 "ESC state gathers axle geometry, steering and contact counts using an orthonormal chassis basis");
+    memdelete(front);
+    memdelete(rear);
+
+    VehicleAerodynamics aero;
+    const AerodynamicForces forces = aero.compute(Vector3(0.0, 0.0, 20.0));
+    state.expect(near(forces.drag.z, real_t{-188.65}, real_t{0.001}) && near(forces.downforce, real_t{80.85}, real_t{0.001}),
+                 "Aerodynamic drag and downforce retain their existing behavior after ESC extraction");
 }
 
 void test_skid_marks(TestState &state) {
@@ -1585,6 +2117,7 @@ void test_tuning_resources(TestState &state) {
 
     for (int steps : {1, 2, 8}) {
         Ref<TireData> response_tire = make_grip_tire(real_t{2.0});
+        response_tire->set_forward_friction_curve(Ref<Curve>());
         response_tire->set_lateral_friction_curve(Ref<Curve>());
         response_tire->set_force_response_low_speed_ms(real_t{42.0});
         response_tire->set_force_response_108_kph_ms(real_t{42.0});
@@ -1593,9 +2126,11 @@ void test_tuning_resources(TestState &state) {
             wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
                              real_t{0.042} / static_cast<real_t>(steps), real_t{0.0}, false);
         }
-        state.expect(near(wheel->prev_longitudinal_force,
-                          -real_t{10.0} * (real_t{1.0} - std::exp(-real_t{1.0})), real_t{2e-4}),
-                     "Tire force reaches 63 percent in one time constant across substeps");
+        const real_t response = real_t{1.0} - std::exp(-real_t{1.0});
+        state.expect(near(wheel->relaxed_slip_velocity, -real_t{3.0} * response) &&
+                         near(wheel->prev_longitudinal_force,
+                              -real_t{10.0} * std::tanh(real_t{3.0} * response / std::hypot(real_t{3.0}, real_t{3.0}) / real_t{0.15}), real_t{2e-4}),
+                     "Tire slip reaches 63 percent in one time constant before generating force across substeps");
         memdelete(wheel);
     }
     Ref<TireData> immediate_tire = make_grip_tire(real_t{2.0});
@@ -1645,8 +2180,8 @@ void test_tuning_resources(TestState &state) {
         feedback_rack.load(steering);
         for (int i = 0; i < 600; ++i)
             feedback_rack.solve(real_t{1.0}, -real_t{10.0}, real_t{1.0} / real_t{120.0});
-        state.expect(near(feedback_rack.get_angle(), Math::deg_to_rad(real_t{35.0}) - real_t{0.0125}),
-                     "Changing steering response time preserves road-feedback deflection scaling");
+        state.expect(near(feedback_rack.get_angle(), Math::deg_to_rad(real_t{35.0})),
+                     "Bounded SAT settles at driver target across response times");
     }
     steering->set_response_time_ms(std::numeric_limits<real_t>::infinity());
     state.expect(near(steering->get_response_time_ms(), real_t{160.0}),
@@ -1672,6 +2207,93 @@ void test_tuning_resources(TestState &state) {
     state.expect(near(differential->get_power_lock_ratio(), real_t{0.5}) &&
                      near(differential->get_slip_sensitive_gain(), real_t{0.0}),
                  "Differential percentages and speed coupling enforce valid domains");
+}
+
+void test_esc_slew(TestState &state) {
+    VehicleStabilityControl esc;
+    Ref<ESCData> data = memnew(ESCData);
+    data->set_maximum_corrective_torque(real_t{1000.0});
+    data->set_torque_engagement_rate(real_t{100.0});
+    data->set_torque_release_rate(real_t{200.0});
+    StabilityState sample;
+    sample.vehicle_mass = real_t{1200.0};
+    sample.wheelbase = real_t{2.5};
+    sample.trackwidth = real_t{1.6};
+    sample.grounded_wheels = 4;
+    sample.linear_velocity = Vector3(0.0, 0.0, 20.0);
+    sample.angular_velocity = Vector3(0.0, -10.0, 0.0);
+    esc.load_parameters(data);
+    state.expect(esc.update(sample, real_t{0.1}) == esc.compute_torque(sample), "Disabled smoothing reproduces raw ESC exactly");
+    data->set_torque_smoothing_enabled(true);
+    esc.reset();
+    state.expect(near(esc.update(sample, real_t{0.5}).y, real_t{50.0}), "ESC engagement grows at configured Nm/s");
+    sample.angular_velocity = Vector3();
+    state.expect(near(esc.update(sample, real_t{0.1}).y, real_t{30.0}), "ESC release uses its separate rate");
+    sample.angular_velocity.y = real_t{10.0};
+    state.expect(near(esc.update(sample, real_t{0.25}).y, real_t{-10.0}), "ESC reversal spends partial step releasing then engaging opposite sign");
+    state.expect(near(esc.update(sample, real_t{20.0}).y, real_t{-1000.0}), "Slew stage retains full steady torque ceiling");
+    data->set_maximum_corrective_torque(real_t{50.0});
+    state.expect(near(esc.update(sample, real_t{0.001}).y, real_t{-50.0}), "Reduced ESC cap clamps existing torque immediately");
+    const real_t held = esc.get_telemetry().applied_torque;
+    state.expect(esc.update(sample, real_t{0.0}) == Vector3() &&
+        esc.update(sample, std::numeric_limits<real_t>::quiet_NaN()) == Vector3() &&
+        near(esc.get_telemetry().applied_torque, held), "Invalid dt returns zero without advancing history");
+    sample.grounded_wheels = 0;
+    state.expect(esc.update(sample, real_t{0.1}) == Vector3(), "Airborne ESC resets immediately");
+    sample.grounded_wheels = 4;
+    state.expect(near(esc.update(sample, real_t{0.1}).y, real_t{-10.0}), "Touchdown engages from zero");
+    data->set_enabled(false);
+    state.expect(esc.update(sample, real_t{0.1}) == Vector3(), "Live disabled resource clears ESC torque");
+    data->set_enabled(true);
+    esc.update(sample, real_t{0.1});
+    Ref<ESCData> replacement = memnew(ESCData);
+    replacement->set_torque_smoothing_enabled(true);
+    replacement->set_torque_engagement_rate(real_t{100.0});
+    esc.load_parameters(replacement);
+    state.expect(near(esc.update(sample, real_t{0.1}).y, real_t{-10.0}), "ESC resource replacement resets output history");
+    sample.linear_velocity.x = std::numeric_limits<real_t>::infinity();
+    state.expect(esc.update(sample, real_t{0.1}) == Vector3(), "Invalid chassis observation resets ESC");
+    sample.linear_velocity = Vector3(0.0, 0.0, 20.0);
+    esc.load_parameters(Ref<ESCData>());
+    state.expect(esc.update(sample, real_t{0.1}) == Vector3(), "Null ESC applies exactly zero torque");
+    data->set_maximum_corrective_torque(real_t{1000.0});
+    for (int hz : {30, 60, 120, 240}) {
+        esc.load_parameters(data);
+        esc.reset();
+        for (int tick = 0; tick < hz; ++tick) esc.update(sample, real_t{1.0} / hz);
+        state.expect(near(esc.get_telemetry().applied_torque, real_t{-100.0}, real_t{0.002}), "ESC growth is comparable across physics rates");
+        sample.linear_velocity.z = 0.0;
+        esc.update(sample, real_t{0.1});
+        state.expect(near(esc.get_telemetry().applied_torque, real_t{-80.0}, real_t{0.002}) && esc.get_telemetry().speed_gate,
+            "Normal speed gate releases smoothly");
+        sample.linear_velocity.z = -20.0;
+        state.expect(esc.compute_torque(sample).y < real_t{0.0}, "ESC reverse policy retains existing yaw correction sign");
+        sample.linear_velocity.z = 20.0;
+    }
+    data->set_torque_engagement_rate(0.0);
+    data->set_torque_release_rate(std::numeric_limits<real_t>::infinity());
+    state.expect(near(data->get_torque_engagement_rate(), real_t{100.0}) && near(data->get_torque_release_rate(), real_t{200.0}), "ESC rates reject nonfinite and nonpositive values");
+}
+
+void test_current_tire_directions(TestState &state) {
+    Ref<TireData> tire = make_grip_tire(real_t{2.0});
+    tire->set_forward_friction_curve(Ref<Curve>());
+    tire->set_lateral_friction_curve(Ref<Curve>());
+    for (const Vector3 &normal : {Vector3(0.0, 1.0, 0.0), Vector3(0.3, 1.0, 0.2).normalized()}) {
+        Wheel *wheel = make_combined_grip_wheel(tire);
+        wheel->collision_normal = normal;
+        for (real_t steer : {real_t{0.4}, real_t{-0.4}}) {
+            wheel->set_basis(Basis(Vector3(0.0, 1.0, 0.0), steer));
+            const Vector3 expected = wheel->get_basis().get_column(2);
+            const Vector3 tangent = (expected - normal * expected.dot(normal)).normalized();
+            wheel->tire_force = Vector3();
+            wheel->get_rotational_body_for_setup()->set_angular_velocity(real_t{10.0});
+            wheel->solve_tire(Vector3(), Vector3(), Vector3(), real_t{0.01}, real_t{0.0}, false);
+            state.expect(wheel->forward_vector.is_equal_approx(expected) && wheel->tire_force.normalized().is_equal_approx(tangent),
+                "First tire solve after reversal uses current steering on flat and banked contacts");
+        }
+        memdelete(wheel);
+    }
 }
 
 void test_steering_sat(TestState &state) {
@@ -1740,14 +2362,14 @@ void test_steering_sat(TestState &state) {
     SteeringRack positive_rack;
     positive_rack.load(rack_data);
     positive_rack.solve(real_t{1.0}, real_t{-100000.0}, real_t{0.01}, real_t{0.0});
-    state.expect(near(positive_rack.get_angle(), real_t{0.0}),
-                 "Opposing SAT caps at positive driver restoring authority");
+    state.expect(positive_rack.get_angle() > real_t{0.0},
+                 "Opposing SAT preserves positive driver restoring authority");
 
     SteeringRack negative_rack;
     negative_rack.load(rack_data);
     negative_rack.solve(real_t{-1.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
-    state.expect(near(negative_rack.get_angle(), real_t{0.0}),
-                 "Opposing SAT caps at negative driver restoring authority");
+    state.expect(near(negative_rack.get_angle(), -positive_rack.get_angle()),
+                 "SAT authority is symmetric for negative steering");
 
     SteeringRack neutral_rack;
     neutral_rack.load(rack_data);
@@ -1756,8 +2378,32 @@ void test_steering_sat(TestState &state) {
     SteeringRack assisting_rack;
     assisting_rack.load(rack_data);
     assisting_rack.solve(real_t{1.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
-    state.expect(near(assisting_rack.get_angle(), kPi / real_t{6.0}),
-                 "Assisting SAT remains unrestricted up to rack travel limit");
+    state.expect(assisting_rack.get_angle() > neutral_rack.get_angle() &&
+                     assisting_rack.get_angle() <= neutral_rack.get_angle() * real_t{1.35},
+                 "Assisting SAT is bounded by driver authority as well as deflection");
+    state.expect(positive_rack.get_angle() >= neutral_rack.get_angle() * real_t{0.65} &&
+                     std::abs(positive_rack.get_applied_feedback()) <= Math::deg_to_rad(real_t{5.0}) *
+                         real_t{0.3} * std::pow(real_t{3.88972017} / real_t{0.2}, real_t{2.0}),
+                 "SAT retains minimum driver torque and obeys absolute feedback bound");
+
+    rack_data->set_minimum_driver_authority(real_t{1.0});
+    SteeringRack full_authority_rack;
+    full_authority_rack.load(rack_data);
+    full_authority_rack.solve(real_t{1.0}, real_t{-100000.0}, real_t{0.01});
+    state.expect(near(full_authority_rack.get_angle(), neutral_rack.get_angle()) &&
+                     full_authority_rack.get_applied_feedback() == real_t{0.0},
+                 "Full driver authority disables SAT smoothly with exact zero feedback");
+    rack_data->set_minimum_driver_authority(real_t{0.65});
+    rack_data->set_max_feedback_deflection_deg(real_t{0.0});
+    SteeringRack zero_deflection_rack;
+    zero_deflection_rack.load(rack_data);
+    zero_deflection_rack.solve(real_t{1.0}, real_t{100000.0}, real_t{0.01});
+    state.expect(near(zero_deflection_rack.get_angle(), neutral_rack.get_angle()),
+                 "Zero deflection limit disables assisting feedback");
+    for (int i = 0; i < 600; ++i)
+        assisting_rack.solve(real_t{5.0}, real_t{100000.0}, real_t{0.01});
+    state.expect(assisting_rack.get_angle() <= Math::deg_to_rad(real_t{30.0}) &&
+                     assisting_rack.get_angle() >= real_t{0.0}, "Bounded SAT respects rack travel under sustained assisting torque");
 
     SteeringRack zero_command_rack;
     zero_command_rack.load(rack_data);
@@ -2150,7 +2796,14 @@ bool DrivetrainRegression::run() {
     test_gearbox(state);
     test_turbo(state);
     test_engine(state);
+    test_engine_reaction(state);
     test_tire_combined_grip(state);
+    test_longitudinal_slip_curve(state);
+    test_contact_basis(state);
+    test_tire_transients(state);
+    test_stability_control(state);
+    test_esc_slew(state);
+    test_current_tire_directions(state);
     test_skid_marks(state);
     test_tuning_resources(state);
     test_steering_sat(state);
