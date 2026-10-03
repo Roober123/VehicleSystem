@@ -1,104 +1,43 @@
 #include "steering_rack_data.h"
+#include <algorithm>
+#include <cmath>
 
 namespace godot {
 
 void SteeringRackData::_bind_methods() {
-    // Inertia
-    ClassDB::bind_method(D_METHOD("set_inertia", "inertia"), &SteeringRackData::set_inertia);
-    ClassDB::bind_method(D_METHOD("get_inertia"), &SteeringRackData::get_inertia);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "inertia", PROPERTY_HINT_RANGE, "0.001,1,0.001,or_greater"), "set_inertia", "get_inertia");
-
-    // Damping
-    ClassDB::bind_method(D_METHOD("set_damping", "damping"), &SteeringRackData::set_damping);
-    ClassDB::bind_method(D_METHOD("get_damping"), &SteeringRackData::get_damping);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "damping", PROPERTY_HINT_RANGE, "0,15,0.1,or_greater"), "set_damping", "get_damping");
-
-    // Friction coefficient
-    ClassDB::bind_method(D_METHOD("set_friction_coefficient", "coefficient"), &SteeringRackData::set_friction_coefficient);
-    ClassDB::bind_method(D_METHOD("get_friction_coefficient"), &SteeringRackData::get_friction_coefficient);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_coefficient", PROPERTY_HINT_RANGE, "0,5,0.001,or_greater"), "set_friction_coefficient", "get_friction_coefficient");
-
-    // Max angle
-    ClassDB::bind_method(D_METHOD("set_max_angle", "angle"), &SteeringRackData::set_max_angle);
+    ADD_GROUP("Steering Response", "");
+    ClassDB::bind_method(D_METHOD("set_max_angle", "value"), &SteeringRackData::set_max_angle);
     ClassDB::bind_method(D_METHOD("get_max_angle"), &SteeringRackData::get_max_angle);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_angle", PROPERTY_HINT_RANGE, "0,50,0.1,degrees"), "set_max_angle", "get_max_angle");
-
-    // Proportional gain
-    ClassDB::bind_method(D_METHOD("set_proportional_gain", "gain"), &SteeringRackData::set_proportional_gain);
-    ClassDB::bind_method(D_METHOD("get_proportional_gain"), &SteeringRackData::get_proportional_gain);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "proportional_gain", PROPERTY_HINT_RANGE, "100,500,0.001,or_greater"), "set_proportional_gain", "get_proportional_gain");
-
-    // Derivative gain
-    ClassDB::bind_method(D_METHOD("set_derivative_gain", "gain"), &SteeringRackData::set_derivative_gain);
-    ClassDB::bind_method(D_METHOD("get_derivative_gain"), &SteeringRackData::get_derivative_gain);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "derivative_gain", PROPERTY_HINT_RANGE, "15,35,0.001,or_greater"), "set_derivative_gain", "get_derivative_gain");
-
-    // SAT gain
-    ClassDB::bind_method(D_METHOD("set_sat_gain", "gain"), &SteeringRackData::set_sat_gain);
-    ClassDB::bind_method(D_METHOD("get_sat_gain"), &SteeringRackData::get_sat_gain);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sat_gain", PROPERTY_HINT_RANGE, "0,1,0.001,or_greater"), "set_sat_gain", "get_sat_gain");
+    ClassDB::bind_method(D_METHOD("set_response_time_ms", "value"), &SteeringRackData::set_response_time_ms);
+    ClassDB::bind_method(D_METHOD("get_response_time_ms"), &SteeringRackData::get_response_time_ms);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "response_time_ms", PROPERTY_HINT_RANGE, "10,1000,1,or_greater,suffix:ms"), "set_response_time_ms", "get_response_time_ms");
+    ClassDB::bind_method(D_METHOD("set_steering_half_speed_kph", "value"), &SteeringRackData::set_steering_half_speed_kph);
+    ClassDB::bind_method(D_METHOD("get_steering_half_speed_kph"), &SteeringRackData::get_steering_half_speed_kph);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "steering_half_speed_kph", PROPERTY_HINT_RANGE, "0,200,1,or_greater,suffix:km/h"), "set_steering_half_speed_kph", "get_steering_half_speed_kph");
+    ClassDB::bind_method(D_METHOD("set_road_feedback_strength", "value"), &SteeringRackData::set_road_feedback_strength);
+    ClassDB::bind_method(D_METHOD("get_road_feedback_strength"), &SteeringRackData::get_road_feedback_strength);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "road_feedback_strength", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater"), "set_road_feedback_strength", "get_road_feedback_strength");
+    ADD_GROUP("Advanced", "");
+    ClassDB::bind_method(D_METHOD("set_friction_torque", "value"), &SteeringRackData::set_friction_torque);
+    ClassDB::bind_method(D_METHOD("get_friction_torque"), &SteeringRackData::get_friction_torque);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction_torque", PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:Nm"), "set_friction_torque", "get_friction_torque");
 }
 
-// Inertia
-void SteeringRackData::set_inertia(real_t p_inertia) {
-    inertia = p_inertia;
+void SteeringRackData::set_max_angle(real_t value) {
+    max_angle = std::isfinite(value) ? std::clamp(value, real_t{0}, real_t{80}) : real_t{35.0};
+}
+void SteeringRackData::set_response_time_ms(real_t value) {
+    response_time_ms = std::isfinite(value) ? std::clamp(value, real_t{10}, real_t{10000}) : real_t{160.0};
+}
+void SteeringRackData::set_steering_half_speed_kph(real_t value) {
+    steering_half_speed_kph = std::isfinite(value) ? std::clamp(value, real_t{0}, real_t{10000}) : real_t{50.0};
+}
+void SteeringRackData::set_road_feedback_strength(real_t value) {
+    road_feedback_strength = std::isfinite(value) ? std::clamp(value, real_t{0}, real_t{10}) : real_t{0.5};
+}
+void SteeringRackData::set_friction_torque(real_t value) {
+    friction_torque = std::isfinite(value) ? std::clamp(value, real_t{0}, real_t{1000}) : real_t{0.3};
 }
 
-real_t SteeringRackData::get_inertia() const {
-    return inertia;
-}
-
-// Damping
-void SteeringRackData::set_damping(real_t p_damping) {
-    damping = p_damping;
-}
-
-real_t SteeringRackData::get_damping() const {
-    return damping;
-}
-
-// Friction coefficient
-void SteeringRackData::set_friction_coefficient(real_t p_coefficient) {
-    friction_coefficient = p_coefficient;
-}
-
-real_t SteeringRackData::get_friction_coefficient() const {
-    return friction_coefficient;
-}
-
-// Max angle
-void SteeringRackData::set_max_angle(real_t p_angle) {
-    max_angle = p_angle;
-}
-
-real_t SteeringRackData::get_max_angle() const {
-    return max_angle;
-}
-
-// Proportional gain
-void SteeringRackData::set_proportional_gain(real_t p_gain) {
-    proportional_gain = p_gain;
-}
-
-real_t SteeringRackData::get_proportional_gain() const {
-    return proportional_gain;
-}
-
-// Derivative gain
-void SteeringRackData::set_derivative_gain(real_t p_gain) {
-    derivative_gain = p_gain;
-}
-
-real_t SteeringRackData::get_derivative_gain() const {
-    return derivative_gain;
-}
-
-// SAT gain
-void SteeringRackData::set_sat_gain(real_t p_gain) {
-    sat_gain = p_gain;
-}
-
-real_t SteeringRackData::get_sat_gain() const {
-    return sat_gain;
-}
-}
+} // namespace godot

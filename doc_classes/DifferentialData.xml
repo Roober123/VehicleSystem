@@ -1,63 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="DifferentialData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
-	<brief_description>
-		Configuration for a driven axle's wheel differential.
-	</brief_description>
-	<description>
-		DifferentialData selects an [code]OPEN[/code], [code]LIMITED_SLIP[/code], or [code]LOCKED[/code] policy for relative motion between an axle's two wheel bodies. The axle's positive [member Axle.drive_share] is a separate value: direct [code]RotationalNetwork[/code] setup copies each policy into [code]DifferentialSettings[/code] and normalizes positive shares across one through eight driven axles as flat weights, with no inter-axle differential. At each solve the carrier velocity is computed directly from predicted left/right wheel velocities. In [code]OPEN[/code] mode no relative row is constructed; [code]LOCKED[/code] mode constructs a transient row with unbounded capacity. In [code]LIMITED_SLIP[/code], lock capacity is [code]min(max_lock_torque, preload_torque + active_lock_ratio * abs(transmitted_torque) + slip_sensitive_gain * abs(relative_slip))[/code]. The active ratio is [member power_lock_ratio] when transmitted torque times carrier velocity is non-negative (power) and [member coast_lock_ratio] otherwise (coast). Settings are copied into fixed setup storage; runtime solving performs no dynamic allocation.
-	</description>
-	<tutorials>
-	</tutorials>
-	<methods>
-		<method name="set_mode" qualifiers="">
-			<return type="void" /><param index="0" name="mode" type="int" />
-			<description>Sets the differential mode: Open, Limited Slip, or Locked.</description>
-		</method>
-		<method name="get_mode" qualifiers="const">
-			<return type="int" /><description>Returns the configured differential mode.</description>
-		</method>
-		<method name="set_preload_torque" qualifiers="">
-			<return type="void" /><param index="0" name="value" type="float" />
-			<description>Sets the baseline limited-slip locking torque. Default: 25 Nm.</description>
-		</method>
-		<method name="get_preload_torque" qualifiers="const">
-			<return type="float" /><description>Returns the baseline limited-slip locking torque (default 25 Nm).</description>
-		</method>
-		<method name="set_power_lock_ratio" qualifiers="">
-			<return type="void" /><param index="0" name="value" type="float" />
-			<description>Sets the limited-slip lock ratio used for positive transmitted power. Default: 0.35.</description>
-		</method>
-		<method name="get_power_lock_ratio" qualifiers="const">
-			<return type="float" /><description>Returns the positive-power limited-slip lock ratio (default 0.35).</description>
-		</method>
-		<method name="set_coast_lock_ratio" qualifiers="">
-			<return type="void" /><param index="0" name="value" type="float" />
-			<description>Sets the limited-slip lock ratio used during coast or engine braking. Default: 0.15.</description>
-		</method>
-		<method name="get_coast_lock_ratio" qualifiers="const">
-			<return type="float" /><description>Returns the coast limited-slip lock ratio (default 0.15).</description>
-		</method>
-		<method name="set_slip_sensitive_gain" qualifiers="">
-			<return type="void" /><param index="0" name="value" type="float" />
-			<description>Sets the bounded lock-capacity gain per rad/s of relative speed. Default: 2 Nm per rad/s.</description>
-		</method>
-		<method name="get_slip_sensitive_gain" qualifiers="const">
-			<return type="float" /><description>Returns the relative-speed lock-capacity gain (default 2 Nm per rad/s).</description>
-		</method>
-		<method name="set_max_lock_torque" qualifiers="">
-			<return type="void" /><param index="0" name="value" type="float" />
-			<description>Sets the maximum limited-slip locking torque cap. Default: 250 Nm.</description>
-		</method>
-		<method name="get_max_lock_torque" qualifiers="const">
-			<return type="float" /><description>Returns the maximum limited-slip locking torque cap (default 250 Nm).</description>
-		</method>
-	</methods>
-	<members>
-		<member name="mode" type="int" setter="set_mode" getter="get_mode" enum="DifferentialData.Mode" default="0">Open (0), Limited Slip (1), or Locked (2).</member>
-		<member name="preload_torque" type="float" setter="set_preload_torque" getter="get_preload_torque" default="25.0">Baseline limited-slip locking torque in Nm. Inactive for Open and Locked modes.</member>
-		<member name="power_lock_ratio" type="float" setter="set_power_lock_ratio" getter="get_power_lock_ratio" default="0.35">Lock ratio when transmitted torque times carrier velocity is non-negative. Inactive for Open and Locked modes.</member>
-		<member name="coast_lock_ratio" type="float" setter="set_coast_lock_ratio" getter="get_coast_lock_ratio" default="0.15">Lock ratio when transmitted torque times carrier velocity is negative. Inactive for Open and Locked modes.</member>
-		<member name="slip_sensitive_gain" type="float" setter="set_slip_sensitive_gain" getter="get_slip_sensitive_gain" default="2.0">Lock-capacity gain in Nm per rad/s of relative speed. Inactive for Open and Locked modes.</member>
-		<member name="max_lock_torque" type="float" setter="set_max_lock_torque" getter="get_max_lock_torque" default="250.0">Maximum limited-slip lock capacity in Nm. Inactive for Open and Locked modes.</member>
-	</members>
+    <brief_description>Axle differential policy with locking percentages and coupling torque.</brief_description>
+    <description>Open permits wheel-speed differences; Locked enforces equal wheel angular velocity without a finite torque cap. Limited Slip applies equal and opposite coupling torques to oppose wheel-speed differences. Its settings are hidden in the Inspector in other modes but remain saved. Numeric settings are copied into fixed runtime storage during setup; apply edits with [method Vehicle.restart]. Axle drive shares are normalized separately and there is no inter-axle differential.</description>
+    <tutorials>
+    </tutorials>
+    <members>
+        <member name="mode" type="int" setter="set_mode" getter="get_mode" enum="DifferentialData.Mode" default="0">Open, Limited Slip, or Locked. Limited-slip fields are only shown for Limited Slip mode.</member>
+        <member name="acceleration_lock_percent" type="float" setter="set_acceleration_lock_percent" getter="get_acceleration_lock_percent" default="70.0">Torque-driven locking effect when axle input torque and carrier velocity have the same sign, including reverse acceleration. The percentage is the supported wheel torque imbalance relative to total input torque, excluding preload, speed coupling, and the cap. Capacity contribution is abs(input torque) times percent divided by 200, because the correction adds to one wheel and subtracts from the other. At 40% and 100 Nm input, the torque-driven correction capacity is 20 Nm. A 100% setting is still finite and is not equivalent to Locked.</member>
+        <member name="engine_braking_lock_percent" type="float" setter="set_engine_braking_lock_percent" getter="get_engine_braking_lock_percent" default="30.0">Torque-driven locking percentage when axle input torque and carrier velocity oppose one another, including reverse engine braking. Selection follows transmitted power rather than throttle or wheel-brake input. Uses the same percent/200 capacity conversion as acceleration locking.</member>
+        <member name="preload_torque" type="float" setter="set_preload_torque" getter="get_preload_torque" default="25.0">Baseline limited-slip coupling capacity in Nm, including at zero input torque. Higher values resist wheel-speed differences more strongly during low-torque cornering. Capped by [member max_lock_torque].</member>
+        <member name="max_lock_torque" type="float" setter="set_max_lock_torque" getter="get_max_lock_torque" default="250.0">Advanced cap on limited-slip coupling torque in Nm. Actual applied correction can be smaller than capacity. Total capacity is min(cap, preload + abs(input torque)*active_percent/200 + speed-dependent coupling). Inactive in Open and Locked modes.</member>
+        <member name="speed_lock_torque_per_100_rpm" type="float" setter="set_speed_lock_torque_per_100_rpm" getter="get_speed_lock_torque_per_100_rpm" default="20.943951">Advanced additional coupling capacity in Nm for each 100 RPM difference between wheel speeds. This contributes even at zero input torque. Zero disables speed-dependent coupling. The sum of all contributions is capped by [member max_lock_torque].</member>
+    </members>
 </class>

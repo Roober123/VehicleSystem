@@ -1,55 +1,24 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="TireData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
-	<brief_description>
-		A resource that defines tire parameters for the tanh-based tire model.
-	</brief_description>
-	<description>
-		TireData is a [Resource] that configures tire behavior: grip (friction coefficient), radius, brake power, bearing drag, peak slip angle (controls how sharp the tire bites), relaxation times for force smoothing, combined-grip exponent, and self-aligning torque trail parameters. [Wheel] computes the internal SAT moment as [code]lateral_force * trail[/code]; because its applied world lateral force is [code]-right_tangent * lateral_force[/code], SAT opposes that applied force. Tire parameters are copied to each [Wheel] during running-gear setup.
-	</description>
-	<tutorials>
-	</tutorials>
-	<members>
-		<member name="friction_forward" type="float" setter="set_friction_forward" getter="get_friction_forward" default="1.0">
-			Longitudinal (forward) tire friction coefficient. Higher values increase grip for acceleration and braking.
-		</member>
-		<member name="friction_lateral" type="float" setter="set_friction_lateral" getter="get_friction_lateral" default="1.0">
-			Lateral (cornering) tire friction coefficient. Higher values increase grip when turning.
-		</member>
-		<member name="forward_friction_curve" type="Curve" setter="set_forward_friction_curve" getter="get_forward_friction_curve">
-			Optional [Curve] resource for custom longitudinal friction response. Maps normalized slip velocity (0-2) to a friction multiplier. Overrides the default tanh-based model.
-		</member>
-		<member name="lateral_friction_curve" type="Curve" setter="set_lateral_friction_curve" getter="get_lateral_friction_curve">
-			Optional [Curve] resource for custom lateral friction response. Maps normalized slip angle (0-2) to a friction multiplier. Overrides the default tanh-based model.
-		</member>
-		<member name="combined_grip_exponent" type="float" setter="set_combined_grip_exponent" getter="get_combined_grip_exponent" default="2.0">
-			Exponent [code]p[/code] for combining normalized longitudinal and lateral force. The value is clamped to [1, 16] (default 2). [code]p=2[/code] is the established friction ellipse; larger values progressively retain more simultaneous normalized longitudinal/lateral force before limiting. The configured value is copied to each [Wheel] during setup.
-		</member>
-		<member name="pneumatic_trail" type="float" setter="set_pneumatic_trail" getter="get_pneumatic_trail" default="0.02">
-			Pneumatic trail contribution to simplified self-aligning torque, in metres. Its influence rolls off quadratically with normalized absolute slip angle. Default: 0.02 m. This is a model parameter, not a physical caster-geometry calculation.
-		</member>
-		<member name="mechanical_trail" type="float" setter="set_mechanical_trail" getter="get_mechanical_trail" default="0.02">
-			Mechanical trail contribution to simplified self-aligning torque, in metres. Default: 0.02 m.
-		</member>
-		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.3">
-			Tire radius in meters.
-		</member>
-		<member name="brake_power" type="float" setter="set_brake_power" getter="get_brake_power" default="1500.0">
-			Maximum brake torque in Newton-meters at full brake input.
-		</member>
-		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="0.1">
-			Wheel bearing and rotational drag coefficient. Higher values slow wheel spin faster.
-		</member>
-		<member name="peak_slip_angle" type="float" setter="set_peak_slip_angle" getter="get_peak_slip_angle" default="10.0">
-			Slip angle in degrees at which lateral force reaches ~76% of its maximum. Lower values (e.g. 6-8) give sharper tire bite; higher values (12-16) give softer, more progressive response.
-		</member>
-		<member name="relaxation_low" type="float" setter="set_relaxation_low" getter="get_relaxation_low" default="0.042">
-			Force relaxation time in seconds at zero speed. Lower values make the tire respond faster when stationary or slow (42 ms default).
-		</member>
-		<member name="relaxation_high" type="float" setter="set_relaxation_high" getter="get_relaxation_high" default="0.01">
-			Force relaxation time in seconds at high speed (30 m/s+). Lower values give instant force response (10 ms default).
-		</member>
-		<member name="tire_width" type="float" setter="set_tire_width" getter="get_tire_width" default="0.25">
-			Width of the tire tread in metres. Used by [TireSkid] to set skid-mark width.
-		</member>
-	</members>
+    <brief_description>Tire grip, force response, and aligning feedback in readable units.</brief_description>
+    <description>TireData configures the tire model using grip coefficients, response times in milliseconds, and aligning lever settings. Numeric settings are copied to each [Wheel] during vehicle setup; apply edits with [method Vehicle.restart]. Advanced properties use an ordinary collapsible Inspector group. The default lateral response uses tanh and has no force peak. Custom curves replace that response shape.</description>
+    <tutorials>
+    </tutorials>
+    <members>
+        <member name="friction_forward" type="float" setter="set_friction_forward" getter="get_friction_forward" default="1.0">Longitudinal grip coefficient at the setup reference wheel load. Higher values increase acceleration and braking force.</member>
+        <member name="friction_lateral" type="float" setter="set_friction_lateral" getter="get_friction_lateral" default="1.0">Lateral grip coefficient at the setup reference wheel load. Higher values increase cornering force.</member>
+        <member name="lateral_response_angle" type="float" setter="set_lateral_response_angle" getter="get_lateral_response_angle" default="10.0">Slip angle in degrees at which the default tanh response reaches about 76% of its force limit. Lower values build cornering force sooner. This also sets the angle where pneumatic aligning trail has fully faded. Custom curves use it as their normalized-angle scale.</member>
+        <member name="load_grip_loss_percent" type="float" setter="set_load_grip_loss_percent" getter="get_load_grip_loss_percent" default="6.696701">Grip coefficient reduction at twice the setup reference wheel load, in percent. Default approximately 6.7%; zero disables load sensitivity. At 10%, doubling load gives 90% of the coefficient and 1.8 times total force capacity. The reference load is calculated from equal mass per axle and wheel. Range 0-18.77476% corresponds to exponents 0-0.3; the runtime multiplier remains clamped to 0.75-1.25.</member>
+        <member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.3">Tire radius in metres.</member>
+        <member name="tire_width" type="float" setter="set_tire_width" getter="get_tire_width" default="0.25">Tread width in metres, used for skid-mark width.</member>
+        <member name="brake_power" type="float" setter="set_brake_power" getter="get_brake_power" default="1500.0">Maximum brake torque at full brake input, in Nm.</member>
+        <member name="force_response_low_speed_ms" type="float" setter="set_force_response_low_speed_ms" getter="get_force_response_low_speed_ms" default="42.0">Force response time constant at zero chassis speed, in milliseconds. Lower values build force faster. An isolated constant force change reaches about 63% after this time and 90% after 2.303 times this time. Zero applies the force immediately. Interpolated with the high-speed setting; both force directions share it.</member>
+        <member name="force_response_108_kph_ms" type="float" setter="set_force_response_108_kph_ms" getter="get_force_response_108_kph_ms" default="10.0">Force response time constant at and above 108 km/h chassis speed, in milliseconds. Zero applies force immediately. The time constant is interpolated linearly from the low-speed setting. The exponential update gives the same response to a constant target across substeps.</member>
+        <member name="aligning_trail_mm" type="float" setter="set_aligning_trail_mm" getter="get_aligning_trail_mm" default="40.0">Effective aligning lever before slip-dependent rolloff, in millimetres. Higher values increase self-aligning torque. A 40 mm lever produces 40 Nm per 1000 N of lateral force before rolloff and rack scaling. This is a simplified effective lever, not a caster-geometry calculation.</member>
+        <member name="aligning_trail_retained_percent" type="float" setter="set_aligning_trail_retained_percent" getter="get_aligning_trail_retained_percent" default="50.0">Percentage of the aligning lever retained at and beyond [member lateral_response_angle]. Lower values make aligning feedback fade more during a slide. This is a lever ratio, not the fraction of actual torque retained, since lateral force also changes. Mechanical trail equals total times this fraction; pneumatic trail is the remainder.</member>
+        <member name="drag" type="float" setter="set_drag" getter="get_drag" default="0.1">Advanced rotational bearing-drag coefficient. Higher values slow wheel spin faster.</member>
+        <member name="combined_grip_exponent" type="float" setter="set_combined_grip_exponent" getter="get_combined_grip_exponent" default="2.0">Advanced normalized-force superellipse exponent, clamped to 1-16. Two gives a friction ellipse. Higher values permit more simultaneous cornering and acceleration/braking force.</member>
+        <member name="forward_friction_curve" type="Curve" setter="set_forward_friction_curve" getter="get_forward_friction_curve">Advanced optional longitudinal force curve. Maps absolute slip velocity divided by 3 m/s, clamped to 0-2, to a force multiplier. Overrides the default tanh shape.</member>
+        <member name="lateral_friction_curve" type="Curve" setter="set_lateral_friction_curve" getter="get_lateral_friction_curve">Advanced optional lateral force curve. Maps absolute slip angle divided by [member lateral_response_angle], clamped to 0-2, to a force multiplier. Overrides the default tanh shape.</member>
+    </members>
 </class>

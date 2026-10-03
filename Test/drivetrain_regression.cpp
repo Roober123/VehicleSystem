@@ -108,9 +108,9 @@ Ref<TireData> make_grip_tire(real_t exponent) {
     Ref<TireData> data = make_tire_data();
     data->set_friction_forward(real_t{1.0});
     data->set_friction_lateral(real_t{1.0});
-    data->set_load_sensitivity(real_t{0.0});
-    data->set_relaxation_low(real_t{0.001});
-    data->set_relaxation_high(real_t{0.001});
+    data->set_load_grip_loss_percent(real_t{0.0});
+    data->set_force_response_low_speed_ms(real_t{1.0});
+    data->set_force_response_108_kph_ms(real_t{1.0});
     data->set_combined_grip_exponent(exponent);
     return data;
 }
@@ -153,9 +153,9 @@ Ref<DifferentialData> make_differential_data(
     Ref<DifferentialData> data = memnew(DifferentialData);
     data->set_mode(mode);
     data->set_preload_torque(preload);
-    data->set_power_lock_ratio(power_lock);
-    data->set_coast_lock_ratio(coast_lock);
-    data->set_slip_sensitive_gain(slip_gain);
+    data->set_acceleration_lock_percent(power_lock * real_t{200.0});
+    data->set_engine_braking_lock_percent(coast_lock * real_t{200.0});
+    data->set_speed_lock_torque_per_100_rpm(slip_gain * rpm_to_omega(real_t{100.0}));
     data->set_max_lock_torque(max_lock);
     return data;
 }
@@ -1545,20 +1545,149 @@ void test_skid_marks(TestState &state) {
     memdelete(powered_wheel);
 }
 
+void test_tuning_resources(TestState &state) {
+    Ref<TireData> tire = memnew(TireData);
+    state.expect(near(tire->get_load_sensitivity(), real_t{0.1}) &&
+                     near(tire->get_relaxation_low(), real_t{0.042}) &&
+                     near(tire->get_relaxation_high(), real_t{0.01}) &&
+                     near(tire->get_mechanical_trail(), real_t{0.02}) &&
+                     near(tire->get_pneumatic_trail(), real_t{0.02}),
+                 "Readable tire defaults compile to the established SI settings");
+    tire->set_load_grip_loss_percent(real_t{10.0});
+    state.expect(near(std::pow(real_t{2.0}, -tire->get_load_sensitivity()), real_t{0.9}),
+                 "10 percent load loss gives 90 percent coefficient at twice reference load");
+    tire->set_load_grip_loss_percent(real_t{100.0});
+    state.expect(near(tire->get_load_sensitivity(), real_t{0.3}),
+                 "Load-loss percentage remains within the supported exponent range");
+    tire->set_aligning_trail_mm(real_t{80.0});
+    tire->set_aligning_trail_retained_percent(real_t{25.0});
+    state.expect(near(tire->get_mechanical_trail(), real_t{0.02}) &&
+                     near(tire->get_pneumatic_trail(), real_t{0.06}),
+                 "Aligning lever and retained fraction compile to mechanical and pneumatic trail");
+    tire->set_aligning_trail_retained_percent(real_t{100.0});
+    state.expect(near(tire->get_mechanical_trail(), real_t{0.08}) &&
+                     near(tire->get_pneumatic_trail(), real_t{0.0}),
+                 "Full aligning retention removes pneumatic rolloff");
+    tire->set_aligning_trail_retained_percent(real_t{0.0});
+    state.expect(near(tire->get_mechanical_trail(), real_t{0.0}) &&
+                     near(tire->get_pneumatic_trail(), real_t{0.08}),
+                 "Zero aligning retention removes residual mechanical trail");
+    tire->set_aligning_trail_mm(real_t{0.0});
+    state.expect(near(tire->get_mechanical_trail() + tire->get_pneumatic_trail(), real_t{0.0}),
+                 "Zero aligning lever produces no aligning torque");
+    tire->set_force_response_low_speed_ms(-real_t{1.0});
+    tire->set_force_response_108_kph_ms(std::numeric_limits<real_t>::quiet_NaN());
+    tire->set_lateral_response_angle(real_t{0.0});
+    state.expect(near(tire->get_relaxation_low(), real_t{0.0}) &&
+                     near(tire->get_relaxation_high(), real_t{0.01}) &&
+                     tire->get_lateral_response_angle() > real_t{0.0},
+                 "Tire controls reject invalid domains and reset nonfinite response values");
+
+    for (int steps : {1, 2, 8}) {
+        Ref<TireData> response_tire = make_grip_tire(real_t{2.0});
+        response_tire->set_lateral_friction_curve(Ref<Curve>());
+        response_tire->set_force_response_low_speed_ms(real_t{42.0});
+        response_tire->set_force_response_108_kph_ms(real_t{42.0});
+        Wheel *wheel = make_combined_grip_wheel(response_tire);
+        for (int i = 0; i < steps; ++i) {
+            wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
+                             real_t{0.042} / static_cast<real_t>(steps), real_t{0.0}, false);
+        }
+        state.expect(near(wheel->prev_longitudinal_force,
+                          -real_t{10.0} * (real_t{1.0} - std::exp(-real_t{1.0})), real_t{2e-4}),
+                     "Tire force reaches 63 percent in one time constant across substeps");
+        memdelete(wheel);
+    }
+    Ref<TireData> immediate_tire = make_grip_tire(real_t{2.0});
+    immediate_tire->set_lateral_friction_curve(Ref<Curve>());
+    immediate_tire->set_force_response_low_speed_ms(real_t{0.0});
+    immediate_tire->set_force_response_108_kph_ms(real_t{0.0});
+    Wheel *immediate_wheel = make_combined_grip_wheel(immediate_tire);
+    immediate_wheel->solve_tire(Vector3(), Vector3(0.0, 0.0, 3.0), Vector3(),
+                               real_t{0.001}, real_t{0.0}, false);
+    state.expect(near(immediate_wheel->prev_longitudinal_force, -real_t{10.0}),
+                 "Zero tire response time explicitly applies force immediately");
+    memdelete(immediate_wheel);
+
+    Ref<SteeringRackData> steering = memnew(SteeringRackData);
+    steering->set_friction_torque(real_t{0.0});
+    steering->set_road_feedback_strength(real_t{0.0});
+    for (int steps : {1, 2, 8, 40}) {
+        for (real_t input : {-real_t{0.4}, real_t{0.4}}) {
+            SteeringRack rack;
+            rack.load(steering);
+            for (int i = 0; i < steps; ++i)
+                rack.solve(input, real_t{0.0}, real_t{0.16} / static_cast<real_t>(steps));
+            state.expect(near(rack.get_angle(), input * Math::deg_to_rad(real_t{35.0}) * real_t{0.9}),
+                         "Steering reaches 90 percent at its response time across substeps and signs");
+            for (int i = 0; i < 20; ++i) {
+                rack.solve(input, real_t{0.0}, real_t{0.1});
+                state.expect(std::abs(rack.get_angle()) <= std::abs(input) * Math::deg_to_rad(real_t{35.0}) + kEpsilon,
+                             "Smooth steering does not overshoot its command");
+            }
+        }
+    }
+    SteeringRack speed_rack;
+    speed_rack.load(steering);
+    speed_rack.solve(real_t{1.0}, real_t{0.0}, real_t{2.0}, real_t{50.0});
+    state.expect(near(speed_rack.get_angle(), Math::deg_to_rad(real_t{17.5})),
+                 "Configured half-speed halves steering command");
+    steering->set_steering_half_speed_kph(real_t{0.0});
+    SteeringRack constant_rack;
+    constant_rack.load(steering);
+    constant_rack.solve(real_t{1.0}, real_t{0.0}, real_t{2.0}, real_t{200.0});
+    state.expect(near(constant_rack.get_angle(), Math::deg_to_rad(real_t{35.0})),
+                 "Zero half-speed disables speed-sensitive steering");
+    steering->set_road_feedback_strength(real_t{0.5});
+    for (real_t response_ms : {real_t{100.0}, real_t{500.0}}) {
+        steering->set_response_time_ms(response_ms);
+        SteeringRack feedback_rack;
+        feedback_rack.load(steering);
+        for (int i = 0; i < 600; ++i)
+            feedback_rack.solve(real_t{1.0}, -real_t{10.0}, real_t{1.0} / real_t{120.0});
+        state.expect(near(feedback_rack.get_angle(), Math::deg_to_rad(real_t{35.0}) - real_t{0.0125}),
+                     "Changing steering response time preserves road-feedback deflection scaling");
+    }
+    steering->set_response_time_ms(std::numeric_limits<real_t>::infinity());
+    state.expect(near(steering->get_response_time_ms(), real_t{160.0}),
+                 "Nonfinite steering response time resets to a safe default");
+
+    Ref<DifferentialData> differential = memnew(DifferentialData);
+    differential->set_mode(DifferentialData::LIMITED_SLIP);
+    state.expect(near(differential->get_power_lock_ratio(), real_t{0.35}) &&
+                     near(differential->get_coast_lock_ratio(), real_t{0.15}) &&
+                     near(differential->get_slip_sensitive_gain(), real_t{2.0}),
+                 "Readable differential defaults compile to the established constraint settings");
+    differential->set_acceleration_lock_percent(real_t{40.0});
+    differential->set_engine_braking_lock_percent(real_t{20.0});
+    differential->set_preload_torque(real_t{0.0});
+    differential->set_speed_lock_torque_per_100_rpm(real_t{0.0});
+    const DifferentialSettings settings = DifferentialSettings::from_resource(differential);
+    state.expect(near(settings.capacity(real_t{100.0}, real_t{1.0}, real_t{0.0}), real_t{20.0}) &&
+                     near(settings.capacity(-real_t{100.0}, real_t{1.0}, real_t{0.0}), real_t{10.0}) &&
+                     near(settings.capacity(-real_t{100.0}, -real_t{1.0}, real_t{0.0}), real_t{20.0}),
+                 "Lock percentages include the factor of two and preserve reverse power/coast selection");
+    differential->set_acceleration_lock_percent(real_t{1000.0});
+    differential->set_speed_lock_torque_per_100_rpm(-real_t{1.0});
+    state.expect(near(differential->get_power_lock_ratio(), real_t{0.5}) &&
+                     near(differential->get_slip_sensitive_gain(), real_t{0.0}),
+                 "Differential percentages and speed coupling enforce valid domains");
+}
+
 void test_steering_sat(TestState &state) {
     Ref<TireData> tire = make_tire_data();
     tire->set_forward_friction_curve(Ref<Curve>());
     tire->set_lateral_friction_curve(Ref<Curve>());
     tire->set_friction_forward(real_t{1.0});
     tire->set_friction_lateral(real_t{1.0});
-    tire->set_load_sensitivity(real_t{0.0});
-    tire->set_peak_slip_angle(real_t{10.0});
+    tire->set_load_grip_loss_percent(real_t{0.0});
+    tire->set_lateral_response_angle(real_t{10.0});
     // Keep relaxation slower than the test step so SAT must consume the
     // final relaxed lateral force rather than the raw tire force.
-    tire->set_relaxation_low(real_t{1.0});
-    tire->set_relaxation_high(real_t{1.0});
-    tire->set_pneumatic_trail(real_t{0.06});
-    tire->set_mechanical_trail(real_t{0.01});
+    tire->set_force_response_low_speed_ms(real_t{1000.0});
+    tire->set_force_response_108_kph_ms(real_t{1000.0});
+    tire->set_aligning_trail_mm(real_t{70.0});
+    tire->set_aligning_trail_retained_percent(real_t{100.0} / real_t{7.0});
 
     Wheel *wheel = make_combined_grip_wheel(tire);
     Wheel *negative_wheel = make_combined_grip_wheel(tire);
@@ -1572,7 +1701,7 @@ void test_steering_sat(TestState &state) {
         // this world-space force is the value used by the Mz sign equation.
         const real_t final_lateral_force = target_wheel->tire_force.x;
         const real_t normalized_slip = std::clamp(
-            std::abs(target_wheel->slip_angle) / tire->get_peak_slip_angle(),
+            std::abs(target_wheel->slip_angle) / tire->get_lateral_response_angle(),
             real_t{0.0}, real_t{1.0});
         const real_t expected_trail = tire->get_mechanical_trail() +
                                       tire->get_pneumatic_trail() *
@@ -1603,25 +1732,22 @@ void test_steering_sat(TestState &state) {
     memdelete(negative_wheel);
 
     Ref<SteeringRackData> rack_data = memnew(SteeringRackData);
-    rack_data->set_inertia(real_t{1.0});
-    rack_data->set_damping(real_t{0.0});
-    rack_data->set_friction_coefficient(real_t{0.0});
+    rack_data->set_friction_torque(real_t{0.0});
     rack_data->set_max_angle(real_t{30.0});
-    rack_data->set_proportional_gain(real_t{100.0});
-    rack_data->set_derivative_gain(real_t{0.0});
-    rack_data->set_sat_gain(real_t{1.0});
+    rack_data->set_response_time_ms(real_t{200.0});
+    rack_data->set_road_feedback_strength(real_t{1.0});
 
     SteeringRack positive_rack;
     positive_rack.load(rack_data);
     positive_rack.solve(real_t{1.0}, real_t{-100000.0}, real_t{0.01}, real_t{0.0});
     state.expect(near(positive_rack.get_angle(), real_t{0.0}),
-                 "Opposing SAT caps at positive player/PD authority");
+                 "Opposing SAT caps at positive driver restoring authority");
 
     SteeringRack negative_rack;
     negative_rack.load(rack_data);
     negative_rack.solve(real_t{-1.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
     state.expect(near(negative_rack.get_angle(), real_t{0.0}),
-                 "Opposing SAT caps at negative player/PD authority");
+                 "Opposing SAT caps at negative driver restoring authority");
 
     SteeringRack neutral_rack;
     neutral_rack.load(rack_data);
@@ -1633,11 +1759,11 @@ void test_steering_sat(TestState &state) {
     state.expect(near(assisting_rack.get_angle(), kPi / real_t{6.0}),
                  "Assisting SAT remains unrestricted up to rack travel limit");
 
-    SteeringRack zero_pd_rack;
-    zero_pd_rack.load(rack_data);
-    zero_pd_rack.solve(real_t{0.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
-    state.expect(near(zero_pd_rack.get_angle(), real_t{0.0}),
-                 "SAT cannot initiate rack motion without player/PD torque");
+    SteeringRack zero_command_rack;
+    zero_command_rack.load(rack_data);
+    zero_command_rack.solve(real_t{0.0}, real_t{100000.0}, real_t{0.01}, real_t{0.0});
+    state.expect(near(zero_command_rack.get_angle(), real_t{0.0}),
+                 "SAT cannot initiate rack motion without driver restoring torque");
 }
 
 void test_vehicle_center_of_mass_marker(TestState &state) {
@@ -1706,13 +1832,10 @@ void test_vehicle_runtime_restart(TestState &state) {
     replacement_config->get_gearbox_data()->set_auto_mode(true);
 
     Ref<SteeringRackData> rack_data = memnew(SteeringRackData);
-    rack_data->set_inertia(real_t{1.0});
-    rack_data->set_damping(real_t{0.0});
-    rack_data->set_friction_coefficient(real_t{0.0});
+    rack_data->set_friction_torque(real_t{0.0});
     rack_data->set_max_angle(real_t{35.0});
-    rack_data->set_proportional_gain(real_t{1000.0});
-    rack_data->set_derivative_gain(real_t{0.0});
-    rack_data->set_sat_gain(real_t{0.0});
+    rack_data->set_response_time_ms(real_t{120.0});
+    rack_data->set_road_feedback_strength(real_t{0.0});
 
     Vehicle *vehicle = memnew(Vehicle);
     vehicle->set_config(initial_config);
@@ -2029,6 +2152,7 @@ bool DrivetrainRegression::run() {
     test_engine(state);
     test_tire_combined_grip(state);
     test_skid_marks(state);
+    test_tuning_resources(state);
     test_steering_sat(state);
     test_vehicle_center_of_mass_marker(state);
     test_vehicle_runtime_restart(state);

@@ -43,24 +43,24 @@ void Wheel::set_suspension(real_t suspension_length, real_t stiffness, real_t da
 void Wheel::set_tire(const Ref<TireData>& t) {
     if (t == nullptr)
         return;
-    this->friction_forward = t->friction_forward;
-    this->friction_lateral = t->friction_lateral;
+    this->friction_forward = t->get_friction_forward();
+    this->friction_lateral = t->get_friction_lateral();
     this->forward_friction_curve = t->get_forward_friction_curve();
     this->lateral_friction_curve = t->get_lateral_friction_curve();
-    this->radius = t->radius;
-    this->tire_width = t->tire_width;
-    this->brake_power = t->brake_power;
-    this->peak_slip_angle = t->peak_slip_angle;
+    this->radius = t->get_radius();
+    this->tire_width = t->get_tire_width();
+    this->brake_power = t->get_brake_power();
+    this->peak_slip_angle = t->get_lateral_response_angle();
     this->pneumatic_trail = t->get_pneumatic_trail();
     this->mechanical_trail = t->get_mechanical_trail();
-    this->relaxation_low = t->relaxation_low;
-    this->relaxation_high = t->relaxation_high;
+    this->relaxation_low = t->get_relaxation_low();
+    this->relaxation_high = t->get_relaxation_high();
     this->load_sensitivity = t->get_load_sensitivity();
     this->combined_grip_exponent = t->get_combined_grip_exponent();
 
     // Pass tire width to the skid system
     if (skid)
-        skid->set_ribbon_width(t->tire_width);
+        skid->set_ribbon_width(t->get_tire_width());
 
     constexpr real_t patch_length = real_t{0.4};
     body.set_inertia(patch_length * radius * radius * real_t{25.0});
@@ -345,7 +345,8 @@ void Wheel::_apply_relaxation(real_t& longitudinal_force, real_t& lateral_force,
                                real_t dt, const Vector3& linear_velocity) {
     real_t clamped_speed = std::clamp(std::abs(linear_velocity.length()), real_t{0.0}, real_t{30.0});
     real_t relaxation_time = relaxation_low + (relaxation_high - relaxation_low) * clamped_speed / real_t{30.0};
-    real_t alpha = std::min(dt / std::max(relaxation_time, real_t{1e-6}), real_t{1.0});
+    const real_t alpha = relaxation_time > real_t{0.0}
+        ? -std::expm1(-dt / relaxation_time) : real_t{1.0};
 
     longitudinal_force = prev_longitudinal_force + (longitudinal_force - prev_longitudinal_force) * alpha;
     lateral_force = prev_lateral_force + (lateral_force - prev_lateral_force) * alpha;

@@ -69,7 +69,7 @@ class Wheel : public Node3D {
                            real_t fwd_mu, real_t lat_mu,
                            real_t& out_fwd, real_t& out_lat) const;
 
-    // Lerp-based relaxation with adaptive time constant
+    // Exponential force response with a speed-dependent time constant.
     void _apply_relaxation(real_t& longitudinal_force, real_t& lateral_force,
                            real_t dt, const Vector3& linear_velocity);
 

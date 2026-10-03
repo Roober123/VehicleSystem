@@ -43,8 +43,10 @@ invalid vehicle remains inert, and its configuration cannot be replaced after
 successful initialization.
 
 `DifferentialData` defaults to Open mode. Limited-slip defaults are 25 Nm
-preload, a 0.35 power-lock ratio, a 0.15 coast-lock ratio, 2 Nm per rad/s of
-slip-sensitive gain, and a 250 Nm maximum lock torque. In Limited Slip mode,
+preload, 70% acceleration locking, 30% engine-braking locking, 20.944 Nm per
+100 RPM of speed-sensitive coupling, and a 250 Nm maximum lock torque. These
+authoring values compile to the existing 0.35/0.15 torque ratios and 2 Nm per
+rad/s speed gain. In Limited Slip mode,
 capacity is:
 
 ```text
@@ -54,7 +56,7 @@ min(max_lock_torque,
     + slip_sensitive_gain * abs(relative_speed))
 ```
 
-Power uses the power ratio when transmitted torque multiplied by carrier speed
+Power uses the acceleration ratio when transmitted torque multiplied by carrier speed
 is non-negative; coast uses the coast ratio otherwise. These lock settings are
 inactive in Open and Locked modes.
 

@@ -45,6 +45,7 @@ Run the deterministic Godot regressions headlessly with:
 ```shell
 godot --headless --path project Test/drivetrain_regression.tscn
 godot --headless --path project Test/production_grounded_trace.tscn
+godot --headless --path project --script Test/tuning_resources.gd
 ```
 
 ## Configuration at a glance
@@ -60,6 +61,51 @@ configuration rules, runtime ordering, limits, and notable simulation behavior.
 See [Rotational drivetrain flow](src/Drivetrain/README.md) for the constraint
 model, Schur-complement clutch solve, differential policies, transaction
 semantics, and turbo model.
+
+## Tuning
+
+The resources use Godot's native Inspector groups, range controls, unit suffixes,
+and property tooltips. Advanced settings are in collapsible groups. Differential
+LSD controls are only shown when mode is Limited Slip; their saved values survive
+mode changes. There is no custom editor plugin.
+
+| Resource | Main controls | Starting values |
+|---|---|---|
+| Tire grip | Forward/lateral coefficients; coefficient loss at twice reference wheel load | 1.0 / 1.0; 6.7% loss |
+| Tire response | Force response time constants at zero speed and 108 km/h | 42 ms / 10 ms |
+| Aligning feedback | Total effective aligning lever; lever retained after rolloff | 40 mm; 50% retained |
+| Steering | Time to reach 90% of a command; steering sensitivity half-speed; road feedback strength | 160 ms; 50 km/h; 0.5 |
+| Limited-slip differential | Acceleration locking; engine-braking locking; preload torque | 70%; 30%; 25 Nm |
+
+Lower response times make forces or steering build faster. The tire time constant
+is its 63% response time; its 90% time is about 2.303 times that value. Zero tire
+response time applies forces immediately. The rack is critically damped; its
+specified 90% time is measured with road feedback and friction disabled. A zero
+steering half-speed disables speed-sensitive input.
+
+Load loss describes the grip **coefficient**. For example, 10% loss at twice the
+reference load gives 1.8 times the total force capacity, rather than twice the
+capacity. The reference load is calculated from equal mass per axle and wheel.
+
+Aligning trail is an effective torque lever: 40 mm gives 40 Nm per 1000 N lateral
+force before slip rolloff and rack scaling. Retention controls how much of that
+lever remains during a slide, not how much actual torque remains. Road feedback
+is normalized against steering stiffness so changing response time preserves its
+torque-to-angle scaling. Opposing feedback is capped at the driver's restoring
+torque, while the rack's intrinsic damping remains active.
+
+Differential locking percentages describe torque-driven wheel-torque imbalance,
+not a percentage of wheel-speed lock. At 40% and 100 Nm axle input, the correction
+capacity is 20 Nm, added to one wheel and subtracted from the other. Preload,
+speed coupling, and the maximum torque cap also affect the result. Locked mode
+remains a separate unbounded policy.
+
+Numeric resource edits take effect after a successful `Vehicle.restart()`.
+Duplicate shared resources when tuning one vehicle independently. Hover a field
+for its meaning, units, and effects. The checked-in example has been migrated to
+the new property names; other saved scenes and scripts using the removed names
+must be updated. The example's steering uses a smooth 700 ms response, which is
+close to its previous isolated 90% time but has a different transient shape.
 
 ## Repository layout
 

@@ -1,34 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="SteeringRackData" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
-	<brief_description>
-		A resource that defines steering rack dynamics (P-D controller with inertia).
-	</brief_description>
-	<description>
-		SteeringRackData is a [Resource] that configures the steering rack simulated inside steerable axles. The rack uses a proportional-derivative controller with inertia, damping, and friction to produce smooth steering feel.
-	</description>
-	<tutorials>
-	</tutorials>
-	<members>
-		<member name="inertia" type="float" setter="set_inertia" getter="get_inertia" default="0.3">
-			Rotational inertia of the steering rack. Lower values make steering more responsive.
-		</member>
-		<member name="damping" type="float" setter="set_damping" getter="get_damping" default="5.0">
-			Steering damping coefficient. Higher values smooth out steering oscillations.
-		</member>
-		<member name="friction_coefficient" type="float" setter="set_friction_coefficient" getter="get_friction_coefficient" default="0.3">
-			Coulomb friction in the rack. Higher values add mechanical resistance to steering motion.
-		</member>
-		<member name="max_angle" type="float" setter="set_max_angle" getter="get_max_angle" default="35.0">
-			Maximum steering angle in degrees at the wheels when speed is zero. This is reduced at high speed by the speed-sensitive steering factor.
-		</member>
-		<member name="proportional_gain" type="float" setter="set_proportional_gain" getter="get_proportional_gain" default="400.0">
-			Proportional gain of the steering rack P-D controller. Higher values make the steering snap to the target angle faster.
-		</member>
-		<member name="derivative_gain" type="float" setter="set_derivative_gain" getter="get_derivative_gain" default="25.0">
-			Derivative gain of the steering rack P-D controller. Higher values damp steering velocity.
-		</member>
-		<member name="sat_gain" type="float" setter="set_sat_gain" getter="get_sat_gain" default="0.5">
-			Scales self-aligning torque feedback into the steering rack. Zero proportional-derivative torque grants no SAT authority; opposing SAT is capped at the P-D torque magnitude, while assisting SAT remains unrestricted. Higher values give stronger feedback.
-		</member>
-	</members>
+    <brief_description>Smooth steering configured by response time and road feedback.</brief_description>
+    <description>The rack uses a critically damped response with fixed internal inertia. Users tune a response time rather than coupled P-D gains. The isolated constant-target update is exact across substeps; road feedback and friction can change the observed response. Numeric settings are copied during setup; apply edits with [method Vehicle.restart].</description>
+    <tutorials>
+    </tutorials>
+    <members>
+        <member name="max_angle" type="float" setter="set_max_angle" getter="get_max_angle" default="35.0">Maximum central steering command in degrees at zero speed. Ackermann geometry changes individual inner and outer wheel angles. Speed-sensitive input reduces the target, while the rack retains these travel limits.</member>
+        <member name="response_time_ms" type="float" setter="set_response_time_ms" getter="get_response_time_ms" default="160.0">Time in milliseconds to reach 90% of a step command with road feedback and friction disabled. Lower values steer faster. The response is critically damped, so an isolated step does not overshoot. Minimum 10 ms. Road-feedback gain scales with derived controller stiffness to retain its torque-to-angle effect when response time changes.</member>
+        <member name="steering_half_speed_kph" type="float" setter="set_steering_half_speed_kph" getter="get_steering_half_speed_kph" default="50.0">Speed in km/h where steering command is reduced to half its zero-speed value. Higher values retain more steering sensitivity at speed. Zero disables speed-sensitive input. Scale is 1/(1+abs(speed)/half_speed).</member>
+        <member name="road_feedback_strength" type="float" setter="set_road_feedback_strength" getter="get_road_feedback_strength" default="0.5">Strength of tire self-aligning torque acting on steering. Zero disables feedback. Relative to the 400 Nm/rad reference controller stiffness, an unbounded 10 Nm wheel moment at strength 0.5 corresponds to about 0.72 degrees of deflection. Actual response also depends on tire trail and the authority policy: zero driver restoring torque grants no SAT authority, opposing feedback is capped at restoring torque, and assisting feedback is uncapped until travel limits. Intrinsic response damping remains active independently of the cap. This does not guarantee autonomous self-centering.</member>
+        <member name="friction_torque" type="float" setter="set_friction_torque" getter="get_friction_torque" default="0.3">Advanced steering resisting-torque scale in Nm. Applied as this value times tanh(angular velocity times 5). Higher values resist motion and alter the reference response time. Zero removes this resistance.</member>
+    </members>
 </class>

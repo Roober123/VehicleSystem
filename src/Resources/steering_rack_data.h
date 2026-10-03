@@ -3,39 +3,31 @@
 
 namespace godot {
 
+// Smooth critically damped steering; response time is its no-feedback 90% time.
 class SteeringRackData : public Resource {
     GDCLASS(SteeringRackData, Resource);
-    real_t inertia = 0.3;
 
-    real_t damping = 5.0;
-    real_t friction_coefficient = 0.3;
-    real_t max_angle = 35.0; // degrees
-
-    real_t proportional_gain = 400.0;
-    real_t derivative_gain = 25.0;
-
-    real_t sat_gain = 0.5;
-
-    protected:
+protected:
     static void _bind_methods();
 
-    public:
+public:
+    void set_max_angle(real_t value);
+    real_t get_max_angle() const { return max_angle; }
+    void set_response_time_ms(real_t value);
+    real_t get_response_time_ms() const { return response_time_ms; }
+    void set_steering_half_speed_kph(real_t value);
+    real_t get_steering_half_speed_kph() const { return steering_half_speed_kph; }
+    void set_road_feedback_strength(real_t value);
+    real_t get_road_feedback_strength() const { return road_feedback_strength; }
+    void set_friction_torque(real_t value);
+    real_t get_friction_torque() const { return friction_torque; }
 
-
-    void set_inertia(real_t p_inertia);
-    real_t get_inertia() const;
-    void set_damping(real_t p_damping);
-    real_t get_damping() const;
-    void set_friction_coefficient(real_t p_coefficient);
-    real_t get_friction_coefficient() const;
-    void set_max_angle(real_t p_angle);
-    real_t get_max_angle() const;
-    void set_proportional_gain(real_t p_gain);
-    real_t get_proportional_gain() const;
-    void set_derivative_gain(real_t p_gain);
-    real_t get_derivative_gain() const;
-    void set_sat_gain(real_t p_gain);
-    real_t get_sat_gain() const;
+private:
+    real_t max_angle = 35.0;
+    real_t response_time_ms = 160.0;
+    real_t steering_half_speed_kph = 50.0;
+    real_t road_feedback_strength = 0.5;
+    real_t friction_torque = 0.3;
 };
 
-}
+} // namespace godot
